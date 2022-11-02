@@ -17,6 +17,7 @@ export enum DiffMethod {
   TRIMMED_LINES = 'diffTrimmedLines',
   SENTENCES = 'diffSentences',
   CSS = 'diffCss',
+  JSON = 'diffJson',
 }
 
 export interface DiffInformation {
@@ -71,8 +72,8 @@ const constructLines = (value: string): string[] => {
  * @param compareMethod JsDiff text diff method from https://github.com/kpdecker/jsdiff/tree/v4.0.1#api
  */
 const computeDiff = (
-  oldValue: string,
-  newValue: string,
+  oldValue: string | Object,
+  newValue: string | Object,
   compareMethod: string = DiffMethod.CHARS,
 ): ComputedDiffInformation => {
   const diffArray: JsDiffChangeObject[] = jsDiff[compareMethod](
@@ -121,21 +122,28 @@ const computeDiff = (
  * @param linesOffset line number to start counting from
  */
 const computeLineInformation = (
-  oldString: string,
-  newString: string,
+  oldString: string | Object,
+  newString: string | Object,
   disableWordDiff: boolean = false,
   compareMethod: string = DiffMethod.CHARS,
   linesOffset: number = 0,
 ): ComputedLineInformation => {
-  const diffArray = diff.diffLines(
-    oldString.trimRight(),
-    newString.trimRight(),
-    {
-      newlineIsToken: false,
-      ignoreWhitespace: false,
-      ignoreCase: false,
-    },
-  );
+  let diffArray: Diff.Change[] = [];
+
+  // Use diffLines for strings, and diffJson for objects...
+  if (typeof oldString === 'string' && typeof newString === 'string') {
+    diffArray = diff.diffLines(
+      oldString.trimRight(),
+      newString.trimRight(),
+      {
+        newlineIsToken: false,
+        ignoreWhitespace: false,
+        ignoreCase: false,
+      },
+    );
+  } else {
+    diffArray = diff.diffJson(oldString, newString);
+  }
 
   let rightLineNumber = linesOffset;
   let leftLineNumber = linesOffset;

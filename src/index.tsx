@@ -25,9 +25,9 @@ export enum LineNumberPrefix {
 
 export interface ReactDiffViewerProps {
   // Old value to compare.
-  oldValue: string;
+  oldValue: string | Object;
   // New value to compare.
-  newValue: string;
+  newValue: string | Object;
   // Enable/Disable split view.
   splitView?: boolean;
   // Set line Offset
@@ -104,8 +104,8 @@ class DiffViewer extends React.Component<
   };
 
   public static propTypes = {
-    oldValue: PropTypes.string.isRequired,
-    newValue: PropTypes.string.isRequired,
+    oldValue: PropTypes.any.isRequired,
+    newValue: PropTypes.any.isRequired,
     splitView: PropTypes.bool,
     disableWordDiff: PropTypes.bool,
     compareMethod: PropTypes.oneOf(Object.values(DiffMethod)),
@@ -582,8 +582,10 @@ class DiffViewer extends React.Component<
       hideLineNumbers,
     } = this.props;
 
-    if (typeof oldValue !== 'string' || typeof newValue !== 'string') {
-      throw Error('"oldValue" and "newValue" should be strings');
+    if (this.props.compareMethod !== 'diffJson') {
+      if (typeof oldValue !== 'string' || typeof newValue !== 'string') {
+        throw Error('"oldValue" and "newValue" should be strings');
+      }
     }
 
     this.styles = this.computeStyles(this.props.styles, useDarkTheme);

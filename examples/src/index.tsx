@@ -7,6 +7,9 @@ import ReactDiff, { DiffMethod } from '../../src/index';
 const oldJs = require('./diff/javascript/old.rjs').default;
 const newJs = require('./diff/javascript/new.rjs').default;
 
+const oldJson = require('./diff/json/old.json');
+const newJson = require('./diff/json/new.json');
+
 import logo from '../../logo.png';
 import cn from 'classnames';
 
