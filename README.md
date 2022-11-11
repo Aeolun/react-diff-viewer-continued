@@ -1,4 +1,7 @@
 <img src='https://github.com/Aeolun/react-diff-viewer-continued/raw/master/logo_dark.png' width="100%" alt='React Diff Viewer' />
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 <br/>
 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
@@ -369,6 +372,20 @@ Check package.json for more build scripts.
 ## Contributors
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center"><a href="https://github.com/ericmorgan1"><img src="https://avatars.githubusercontent.com/u/10346191?v=4?s=100" width="100px;" alt="Eric M."/><br /><sub><b>Eric M.</b></sub></a><br /><a href="https://github.com/Aeolun/react-diff-viewer-continued/commits?author=ericmorgan1" title="Code">💻</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
 
