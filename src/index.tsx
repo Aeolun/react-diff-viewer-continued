@@ -531,7 +531,6 @@ class DiffViewer extends React.Component<
               typeof diffBlockStart === 'undefined') &&
             !this.state.expandedBlocks.includes(diffBlockStart)
           ) {
-            console.log('skipping', line)
             skippedLines.push(i + 1);
             // show skipped line indicator only if there is more than one line to hide
             if (i === lineInformation.length - 1 && skippedLines.length > 1) {
