@@ -507,7 +507,7 @@ class DiffViewer extends React.Component<
       oldValue,
       newValue,
       disableWordDiff,
-      DiffMethod.CHARS,
+      compareMethod,
       linesOffset,
     );
     const extraLines =
