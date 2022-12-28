@@ -1,4 +1,4 @@
-import { css, cx, Interpolation } from 'emotion';
+import { css, CSSInterpolation, cx } from '@emotion/css';
 
 export interface ReactDiffViewerStyles {
   diffContainer?: string;
@@ -58,27 +58,27 @@ export interface ReactDiffViewerStylesOverride {
     dark?: ReactDiffViewerStylesVariables;
     light?: ReactDiffViewerStylesVariables;
   };
-  diffContainer?: Interpolation;
-  diffRemoved?: Interpolation;
-  diffAdded?: Interpolation;
-  diffChanged?: Interpolation;
-  marker?: Interpolation;
-  emptyGutter?: Interpolation;
-  highlightedLine?: Interpolation;
-  lineNumber?: Interpolation;
-  highlightedGutter?: Interpolation;
-  contentText?: Interpolation;
-  gutter?: Interpolation;
-  line?: Interpolation;
-  wordDiff?: Interpolation;
-  wordAdded?: Interpolation;
-  wordRemoved?: Interpolation;
-  codeFoldGutter?: Interpolation;
-  codeFold?: Interpolation;
-  emptyLine?: Interpolation;
-  content?: Interpolation;
-  titleBlock?: Interpolation;
-  splitView?: Interpolation;
+  diffContainer?: CSSInterpolation;
+  diffRemoved?: CSSInterpolation;
+  diffAdded?: CSSInterpolation;
+  diffChanged?: CSSInterpolation;
+  marker?: CSSInterpolation;
+  emptyGutter?: CSSInterpolation;
+  highlightedLine?: CSSInterpolation;
+  lineNumber?: CSSInterpolation;
+  highlightedGutter?: CSSInterpolation;
+  contentText?: CSSInterpolation;
+  gutter?: CSSInterpolation;
+  line?: CSSInterpolation;
+  wordDiff?: CSSInterpolation;
+  wordAdded?: CSSInterpolation;
+  wordRemoved?: CSSInterpolation;
+  codeFoldGutter?: CSSInterpolation;
+  codeFold?: CSSInterpolation;
+  emptyLine?: CSSInterpolation;
+  content?: CSSInterpolation;
+  titleBlock?: CSSInterpolation;
+  splitView?: CSSInterpolation;
 }
 
 // eslint-disable-next-line import/no-anonymous-default-export
