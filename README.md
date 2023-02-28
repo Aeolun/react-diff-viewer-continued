@@ -3,7 +3,7 @@
 <br/>
 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat)](#contributors)
+[![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 [![npm version](https://img.shields.io/npm/v/react-diff-viewer-continued)](https://www.npmjs.com/package/react-diff-viewer-continued)
@@ -376,8 +376,9 @@ Check package.json for more build scripts.
 <table>
   <tbody>
     <tr>
-      <td align="center"><a href="https://github.com/ericmorgan1"><img src="https://avatars.githubusercontent.com/u/10346191?v=4?s=100" width="100px;" alt="Eric M."/><br /><sub><b>Eric M.</b></sub></a><br /><a href="https://github.com/Aeolun/react-diff-viewer-continued/commits?author=ericmorgan1" title="Code">💻</a></td>
-      <td align="center"><a href="https://github.com/spyroid"><img src="https://avatars.githubusercontent.com/u/844495?v=4?s=100" width="100px;" alt="Andrei Kovalevsky"/><br /><sub><b>Andrei Kovalevsky</b></sub></a><br /><a href="https://github.com/Aeolun/react-diff-viewer-continued/commits?author=spyroid" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ericmorgan1"><img src="https://avatars.githubusercontent.com/u/10346191?v=4?s=100" width="100px;" alt="Eric M."/><br /><sub><b>Eric M.</b></sub></a><br /><a href="https://github.com/Aeolun/react-diff-viewer-continued/commits?author=ericmorgan1" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/spyroid"><img src="https://avatars.githubusercontent.com/u/844495?v=4?s=100" width="100px;" alt="Andrei Kovalevsky"/><br /><sub><b>Andrei Kovalevsky</b></sub></a><br /><a href="https://github.com/Aeolun/react-diff-viewer-continued/commits?author=spyroid" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="http://kimbiyam.me"><img src="https://avatars.githubusercontent.com/u/59679962?v=4?s=100" width="100px;" alt="Chang Hyun Kim"/><br /><sub><b>Chang Hyun Kim</b></sub></a><br /><a href="https://github.com/Aeolun/react-diff-viewer-continued/commits?author=KimBiYam" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
