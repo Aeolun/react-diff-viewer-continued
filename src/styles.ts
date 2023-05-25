@@ -1,4 +1,5 @@
-import { css, CSSInterpolation, cx } from '@emotion/css';
+import { CSSInterpolation } from '@emotion/css';
+import createEmotion from '@emotion/css/create-instance';
 
 export interface ReactDiffViewerStyles {
   diffContainer?: string;
@@ -85,6 +86,7 @@ export interface ReactDiffViewerStylesOverride {
 export default (
   styleOverride: ReactDiffViewerStylesOverride,
   useDarkTheme = false,
+  nonce = '',
 ): ReactDiffViewerStyles => {
   const { variables: overrideVariables = {}, ...styles } = styleOverride;
 
@@ -152,6 +154,8 @@ export default (
   };
 
   const variables = useDarkTheme ? themeVariables.dark : themeVariables.light;
+
+  const { css, cx } = createEmotion({ key: 'react-diff', nonce });
 
   const content = css({
     width: '100%',
