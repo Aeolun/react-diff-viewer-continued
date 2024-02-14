@@ -1,17 +1,16 @@
 import * as React from 'react';
-import {ReactElement} from 'react';
+import {ReactElement, JSX} from 'react';
 import cn from 'classnames';
 
 import {computeLineInformation, DiffInformation, DiffMethod, DiffType, LineInformation,} from './compute-lines';
 import computeStyles, {ReactDiffViewerStyles, ReactDiffViewerStylesOverride,} from './styles';
 import {Block, computeHiddenBlocks} from "./compute-hidden-blocks";
-import IntrinsicElements = React.JSX.IntrinsicElements;
 import {Expand} from "./expand";
+import memoize from 'memoize-one';
+
 import {Fold} from "./fold";
 
-const m = require('memoize-one');
-
-const memoize = m.default || m;
+type IntrinsicElements = JSX.IntrinsicElements
 
 export enum LineNumberPrefix {
   LEFT = 'L',
@@ -183,6 +182,7 @@ class DiffViewer extends React.Component<
   ): ReactElement[] => {
     return diffArray.map((wordDiff, i): JSX.Element => {
       const content = renderer ? renderer(wordDiff.value as string) : wordDiff.value
+      if (typeof content !== 'string') return;
 
       return wordDiff.type === DiffType.ADDED ?
         <ins
@@ -712,4 +712,5 @@ class DiffViewer extends React.Component<
 }
 
 export default DiffViewer;
-export {ReactDiffViewerStylesOverride, DiffMethod};
+export { DiffMethod}
+export type {ReactDiffViewerStylesOverride};

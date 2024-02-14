@@ -1,12 +1,31 @@
-name: Release
+name: Test & Release
 on:
   push:
-    branches:
-      - master
-      - next
+
 jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 'lts/*'
+      - uses: pnpm/action-setup@v2.2.4
+        with:
+          version: latest
+      - name: Install dependencies
+        run: pnpm i
+      - name: Run unit tests
+        run: pnpm run test
   release:
     name: Release
+    needs: test
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/next'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

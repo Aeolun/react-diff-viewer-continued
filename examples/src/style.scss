@@ -169,6 +169,15 @@ body.light {
   color: #eee;
 }
 
+.select {
+  select {
+    border-radius: 50px;
+    padding: 4px 12px;
+    border: 2px solid #125dec;
+    background: white;
+  }
+}
+
 .react-diff-viewer-example {
   a {
     color: #125dec;

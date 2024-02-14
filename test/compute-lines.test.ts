@@ -1,8 +1,8 @@
-import expect from 'expect';
+import { describe, it, expect } from 'vitest'
 import { computeLineInformation, DiffMethod } from '../src/compute-lines';
 
 describe('Testing compute lines utils', (): void => {
-  it('It should avoid trailing spaces', (): void => {
+  it('It should not avoid trailing spaces', (): void => {
     const oldCode = `test
 
 
@@ -25,8 +25,40 @@ describe('Testing compute lines utils', (): void => {
             value: 'test',
           },
         },
+        {
+          left: {
+            lineNumber: 2,
+            type: 0,
+            value: '',
+          },
+          right: {
+            lineNumber: 2,
+            type: 0,
+            value: '',
+          },
+        },
+        {
+          left: {
+            lineNumber: 3,
+            type: 2,
+            value: ' ',
+          },
+          right: {},
+        },
+        {
+          left: {
+            lineNumber: 4,
+            type: 0,
+            value: '    ',
+          },
+          right: {
+            lineNumber: 3,
+            type: 0,
+            value: '    ',
+          },
+        }
       ],
-      diffLines: [],
+      diffLines: [2],
     });
   });
 

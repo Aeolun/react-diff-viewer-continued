@@ -6,11 +6,15 @@
     "moduleResolution": "node",
     "noImplicitAny": true,
     "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "target": "es2015",
     "declaration": true,
     "downlevelIteration": true,
     "lib": ["es2017", "dom"],
-    "types": ["jest", "node"]
+    "types": ["node"],
+    "outDir": "lib/cjs"
   },
   "include": ["src/", "examples/"],
   "exclude": ["node_modules"]

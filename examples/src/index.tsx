@@ -6,14 +6,14 @@ import logo from '../../logo.png';
 import cn from 'classnames';
 import {render} from "react-dom";
 
-const oldJs = require('./diff/javascript/old.rjs').default;
-const newJs = require('./diff/javascript/new.rjs').default;
+import oldJs from './diff/javascript/old.rjs?raw';
+import newJs from './diff/javascript/new.rjs?raw';
 
-const oldYaml = require('./diff/massive/old.yaml').default;
-const newYaml = require('./diff/massive/new.yaml').default;
+import oldYaml from './diff/massive/old.yaml?raw';
+import newYaml from './diff/massive/new.yaml?raw';
 
-const oldJson = require('./diff/json/old.json');
-const newJson = require('./diff/json/new.json');
+import oldJson from './diff/json/old.json';
+import newJson from './diff/json/new.json';
 
 interface ExampleState {
   splitView?: boolean;
@@ -75,11 +75,11 @@ class Example extends Component<{}, ExampleState> {
   };
 
   public render(): JSX.Element {
-    let oldValue = '', newValue = '';
-    if (this.state.dataType == 'json') {
+    let oldValue: string | object = ''
+    let newValue: string | object = '';
+    if (this.state.dataType === 'json') {
       oldValue = oldJson
       newValue = newJson
-
     } else if (this.state.dataType === 'javascript') {
       oldValue = oldJs
       newValue = newJs
@@ -106,6 +106,9 @@ class Example extends Component<{}, ExampleState> {
             </a>
             Featuring split view, inline view, word diff, line highlight and
             more.
+          </p>
+          <p>
+            This documentation is for the `next` release branch, e.g. v4.x
           </p>
           <div className="cta">
             <a href="https://github.com/aeolun/react-diff-viewer-continued#install">
