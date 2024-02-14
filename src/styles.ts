@@ -210,6 +210,7 @@ export default (
     color: variables.diffViewerColor,
     whiteSpace: 'pre-wrap',
     fontFamily: 'monospace',
+    lineBreak: 'anywhere',
     textDecoration: 'none',
     label: 'content-text',
   });
