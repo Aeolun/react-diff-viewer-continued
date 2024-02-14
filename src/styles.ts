@@ -26,6 +26,7 @@ export interface ReactDiffViewerStyles {
   titleBlock?: string;
   content?: string;
   column?: string;
+  noSelect?: string;
   splitView?: string;
   [key: string]: string | undefined;
 }
@@ -83,6 +84,7 @@ export interface ReactDiffViewerStylesOverride {
   codeFold?: CSSInterpolation;
   emptyLine?: CSSInterpolation;
   content?: CSSInterpolation;
+  noSelect?: CSSInterpolation;
   column?: CSSInterpolation;
   titleBlock?: CSSInterpolation;
   splitView?: CSSInterpolation;
@@ -144,7 +146,7 @@ export default (
         gutterBackgroundDark: '#262933',
         highlightBackground: '#2a3967',
         highlightGutterBackground: '#2d4077',
-        codeFoldGutterBackground: '#21232b',
+        codeFoldGutterBackground: '#262831',
         codeFoldBackground: '#262831',
         emptyLineBackground: '#363946',
         gutterColor: '#666c87',
@@ -164,9 +166,8 @@ export default (
   const { css, cx } = createEmotion({ key: 'react-diff', nonce });
 
   const content = css({
-    width: '100%',
+    width: 'auto',
     label: 'content',
-    flex: 1
   });
 
   const splitView = css({
@@ -188,6 +189,7 @@ export default (
     width: '100%',
     minWidth: '1000px',
     overflowX: 'auto',
+    tableLayout: 'fixed',
     background: variables.diffViewerBackground,
     pre: {
       margin: 0,
@@ -197,7 +199,6 @@ export default (
     },
     label: 'diff-container',
     borderCollapse: 'collapse',
-    display: 'flex'
   });
 
   const lineContent = css({
@@ -207,7 +208,15 @@ export default (
 
   const contentText = css({
     color: variables.diffViewerColor,
+    whiteSpace: 'pre-wrap',
+    fontFamily: 'monospace',
+    textDecoration: 'none',
     label: 'content-text',
+  });
+
+  const unselectable = css({
+    userSelect: 'none',
+    label: 'unselectable',
   });
 
   const titleBlock = css({
@@ -216,6 +225,7 @@ export default (
     lineHeight: '1.4em',
     height: "2.4em",
     overflow: 'hidden',
+    width: '50%',
     borderBottom: `1px solid ${variables.diffViewerTitleBorderColor}`,
     label: 'title-block',
     ':last-child': {
@@ -286,7 +296,8 @@ export default (
   const codeFoldGutter = css({
     backgroundColor: variables.codeFoldGutterBackground,
     label: 'code-fold-gutter',
-    minWidth: '50px'
+    minWidth: '50px',
+    width: '50px'
   });
 
   const codeFoldContentContainer = css({
@@ -320,7 +331,6 @@ export default (
     backgroundColor: variables.codeFoldBackground,
     height: 40,
     fontSize: 14,
-    display: 'flex',
     alignItems: 'center',
     userSelect: 'none',
     fontWeight: 700,
@@ -337,7 +347,6 @@ export default (
   const emptyLine = css({
     backgroundColor: variables.emptyLineBackground,
     label: 'empty-line',
-    flex: 1,
   });
 
   const marker = css({
@@ -373,6 +382,7 @@ export default (
   const gutter = css({
     userSelect: 'none',
     minWidth: 50,
+    width: '50px',
     padding: '0 10px',
     whiteSpace: 'nowrap',
     label: 'gutter',
@@ -413,13 +423,11 @@ export default (
   const line = css({
     verticalAlign: 'baseline',
     label: 'line',
-    height: '1.6em',
-    display: 'flex',
     textDecoration: 'none'
   });
 
   const column = css({
-    flex: 1
+
   })
 
   const defaultStyles: any = {
@@ -441,6 +449,7 @@ export default (
     blockAddition,
     blockDeletion,
     wordRemoved,
+    noSelect: unselectable,
     codeFoldGutter,
     codeFoldContentContainer,
     codeFold,

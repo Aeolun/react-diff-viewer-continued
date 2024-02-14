@@ -9,6 +9,9 @@ import {render} from "react-dom";
 const oldJs = require('./diff/javascript/old.rjs').default;
 const newJs = require('./diff/javascript/new.rjs').default;
 
+const oldYaml = require('./diff/massive/old.yaml').default;
+const newYaml = require('./diff/massive/new.yaml').default;
+
 const oldJson = require('./diff/json/old.json');
 const newJson = require('./diff/json/new.json');
 
@@ -16,10 +19,12 @@ interface ExampleState {
   splitView?: boolean;
   highlightLine?: string[];
   language?: string;
+  lineNumbers: boolean;
   theme: 'dark' | 'light';
   enableSyntaxHighlighting?: boolean;
   columnHeaders: boolean;
   compareMethod?: DiffMethod;
+  dataType: string;
   customGutter?: boolean;
 }
 
@@ -33,8 +38,10 @@ class Example extends Component<{}, ExampleState> {
       theme: 'dark',
       splitView: true,
       columnHeaders: true,
+      lineNumbers: true,
       customGutter: true,
       enableSyntaxHighlighting: true,
+      dataType: 'javascript',
       compareMethod: DiffMethod.CHARS
     };
   }
@@ -68,6 +75,19 @@ class Example extends Component<{}, ExampleState> {
   };
 
   public render(): JSX.Element {
+    let oldValue = '', newValue = '';
+    if (this.state.dataType == 'json') {
+      oldValue = oldJson
+      newValue = newJson
+
+    } else if (this.state.dataType === 'javascript') {
+      oldValue = oldJs
+      newValue = newJs
+    } else {
+      oldValue = oldYaml
+      newValue = newYaml
+    }
+
     return (
       <div className="react-diff-viewer-example">
         <div className="radial"></div>
@@ -182,16 +202,34 @@ class Example extends Component<{}, ExampleState> {
               <label className={'switch'}>
                 <input
                   type="checkbox"
-                  checked={this.state.compareMethod === DiffMethod.JSON}
+                  checked={this.state.lineNumbers}
                   onChange={() => {
                     this.setState({
-                      compareMethod: this.state.compareMethod === DiffMethod.JSON ? DiffMethod.CHARS : DiffMethod.JSON,
+                      lineNumbers: !this.state.lineNumbers,
                     });
                   }}
                 />
                 <span className="slider round"></span>
               </label>
-              <span>JSON</span>
+              <span>Line Numbers</span>
+            </div>
+            <div>
+              <label className={'select'}>
+                <select
+                  value={this.state.dataType}
+                  onChange={(e) => {
+                    this.setState({
+                      dataType: e.currentTarget.value,
+                      compareMethod: e.currentTarget.value === 'json' ? DiffMethod.JSON : DiffMethod.CHARS
+                    });
+                  }}
+                >
+                  <option>javascript</option>
+                  <option>json</option>
+                  <option>yaml</option>
+                </select>
+              </label>
+              <span>Data</span>
             </div>
           </div>
         </div>
@@ -201,15 +239,16 @@ class Example extends Component<{}, ExampleState> {
             onLineNumberClick={this.onLineNumberClick}
             alwaysShowLines={['L-30']}
             extraLinesSurroundingDiff={1}
-            oldValue={this.state.compareMethod === DiffMethod.JSON ? oldJson : oldJs}
+            hideLineNumbers={!this.state.lineNumbers}
+            oldValue={oldValue}
             compareMethod={this.state.compareMethod}
             splitView={this.state.splitView}
-            newValue={this.state.compareMethod === DiffMethod.JSON ? newJson : newJs}
+            newValue={newValue}
             renderGutter={
               this.state.customGutter
                 ? (diffData) => {
                     return (
-                      <div
+                      <td
                         className={
                           diffData.type !== undefined
                             ? cn(diffData.styles.gutter)
@@ -232,7 +271,7 @@ class Example extends Component<{}, ExampleState> {
                             ? '==='
                             : undefined}
                         </pre>
-                      </div>
+                      </td>
                     );
                   }
                 : undefined

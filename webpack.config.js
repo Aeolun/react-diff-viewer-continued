@@ -40,7 +40,7 @@ module.exports = {
         use: [Css.loader, 'css-loader', 'sass-loader'],
       },
       {
-        test: /\.xml|.rjs|.java/,
+        test: /\.xml|.rjs|.java|.yaml/,
         use: 'raw-loader',
       },
       {

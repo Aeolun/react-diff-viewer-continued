@@ -3,6 +3,10 @@ var webpack = require('webpack');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var WriteFilePlugin = require('write-file-webpack-plugin');
+const additionalConfiguration = {
+	contentBase: path.resolve(__dirname, './app'),
+	reloadModules: true,
+}
 module.exports = {
   entry: [
     'webpack/hot/dev-server',
@@ -40,6 +44,8 @@ module.exports = {
       },
     ],
   },
+  trailingSpaces: '',
+  test: "this is an incredibly long string that should be broken up into multiple lines to make it easier to read and maintain. This is a test of the emergency broadcast system. This is only a test. If this were a real emergency, you would be instructed to do something else. But it's not, so you're not. You're just reading a long string. Sorry. ",
   plugins: [
     new WriteFilePlugin(),
     new ExtractTextPlugin('app.css', {

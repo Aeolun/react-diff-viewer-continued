@@ -60,6 +60,7 @@ module.exports = {
       },
     ],
   },
+  trailingSpaces: '',
   plugins: [
     new WriteFilePlugin(),
     new ExtractTextPlugin('app.css', {
