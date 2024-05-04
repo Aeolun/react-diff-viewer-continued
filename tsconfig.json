@@ -3,7 +3,6 @@
     "experimentalDecorators": true,
     "jsx": "react-jsx",
     "module": "commonjs",
-    "strict": true,
     "moduleResolution": "node",
     "noImplicitAny": true,
     "esModuleInterop": true,
