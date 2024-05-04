@@ -1,4 +1,5 @@
 import * as diff from 'diff';
+import { type } from 'os';
 
 const jsDiff: { [key: string]: any } = diff;
 
@@ -75,12 +76,10 @@ const constructLines = (value: string): string[] => {
 const computeDiff = (
   oldValue: string | Object,
   newValue: string | Object,
-  compareMethod: string = DiffMethod.CHARS,
+  compareMethod: DiffMethod | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
 ): ComputedDiffInformation => {
-  const diffArray: JsDiffChangeObject[] = jsDiff[compareMethod](
-    oldValue,
-    newValue,
-  );
+  const compareFunc = (typeof(compareMethod) === 'string') ? jsDiff[compareMethod] : compareMethod
+  const diffArray: JsDiffChangeObject[] = compareFunc(oldValue, newValue);
   const computedDiff: ComputedDiffInformation = {
     left: [],
     right: [],
@@ -127,7 +126,7 @@ const computeLineInformation = (
   oldString: string | Object,
   newString: string | Object,
   disableWordDiff: boolean = false,
-  lineCompareMethod: string = DiffMethod.CHARS,
+  lineCompareMethod: DiffMethod | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
   linesOffset: number = 0,
   showLines: string[] = [],
 ): ComputedLineInformation => {

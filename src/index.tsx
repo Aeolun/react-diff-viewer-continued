@@ -3,6 +3,7 @@ import {ReactElement, JSX} from 'react';
 import cn from 'classnames';
 
 import {computeLineInformation, DiffInformation, DiffMethod, DiffType, LineInformation,} from './compute-lines';
+import { Change } from 'diff';
 import computeStyles, {ReactDiffViewerStyles, ReactDiffViewerStylesOverride,} from './styles';
 import {Block, computeHiddenBlocks} from "./compute-hidden-blocks";
 import {Expand} from "./expand";
@@ -29,7 +30,7 @@ export interface ReactDiffViewerProps {
   // Enable/Disable word diff.
   disableWordDiff?: boolean;
   // JsDiff text diff method from https://github.com/kpdecker/jsdiff/tree/v4.0.1#api
-  compareMethod?: DiffMethod;
+  compareMethod?: DiffMethod | ((oldStr: string, newStr: string) => Change[]);
   // Number of unmodified lines surrounding each line diff.
   extraLinesSurroundingDiff?: number;
   // Show/hide line number.
@@ -596,11 +597,12 @@ class DiffViewer extends React.Component<
       leftTitle,
       rightTitle,
       splitView,
+      compareMethod,
       hideLineNumbers,
       nonce,
     } = this.props;
 
-    if (this.props.compareMethod !== DiffMethod.JSON) {
+    if (typeof(compareMethod) === 'string' && compareMethod !== DiffMethod.JSON) {
       if (typeof oldValue !== 'string' || typeof newValue !== 'string') {
         throw Error('"oldValue" and "newValue" should be strings');
       }

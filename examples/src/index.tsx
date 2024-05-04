@@ -4,7 +4,7 @@ import {Component, MouseEvent} from 'react';
 import ReactDiff, {DiffMethod} from '../../src/index';
 import logo from '../../logo.png';
 import cn from 'classnames';
-import {render} from "react-dom";
+import {createRoot} from "react-dom/client";
 
 import oldJs from './diff/javascript/old.rjs?raw';
 import newJs from './diff/javascript/new.rjs?raw';
@@ -305,4 +305,5 @@ class Example extends Component<{}, ExampleState> {
   }
 }
 
-render(<Example />, document.getElementById('app'));
+const root = createRoot(document.getElementById('app'));
+root.render(<Example />);
