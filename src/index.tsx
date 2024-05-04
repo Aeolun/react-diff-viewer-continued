@@ -589,6 +589,42 @@ class DiffViewer extends React.Component<
     };
   };
 
+  private calculateColSpans = (hideLineNumbers : boolean) => {
+    let colSpanOnSplitView = 3;
+    let colSpanOnInlineView = 4;
+
+    if (hideLineNumbers) {
+      colSpanOnSplitView -= 1;
+      colSpanOnInlineView -= 1;
+    }
+
+    if (this.props.renderGutter) {
+      colSpanOnSplitView += 1;
+      colSpanOnInlineView += 1;
+    }
+
+    return [colSpanOnSplitView, colSpanOnInlineView]
+  }
+
+  private calculateChanges = (nodes) => {
+    let deletions = 0, additions = 0
+    nodes.lineInformation.forEach((l) => {
+      if (l.left.type === DiffType.ADDED) {
+        additions++
+      }
+      if (l.right.type === DiffType.ADDED) {
+        additions++
+      }
+      if (l.left.type === DiffType.REMOVED) {
+        deletions++
+      }
+      if (l.right.type === DiffType.REMOVED) {
+        deletions++
+      }
+    })
+    return [deletions, additions]
+  }
+
   public render = (): ReactElement => {
     const {
       oldValue,
@@ -611,34 +647,9 @@ class DiffViewer extends React.Component<
     this.styles = this.computeStyles(this.props.styles, useDarkTheme, nonce);
     const nodes = this.renderDiff();
 
-    let colSpanOnSplitView = 3;
-    let colSpanOnInlineView = 4;
+    const [colSpanOnSplitView, colSpanOnInlineView] = this.calculateColSpans(hideLineNumbers)
 
-    if (hideLineNumbers) {
-      colSpanOnSplitView -= 1;
-      colSpanOnInlineView -= 1;
-    }
-
-    if (this.props.renderGutter) {
-      colSpanOnSplitView += 1;
-      colSpanOnInlineView += 1;
-    }
-
-    let deletions = 0, additions = 0
-    nodes.lineInformation.forEach((l) => {
-      if (l.left.type === DiffType.ADDED) {
-        additions++
-      }
-      if (l.right.type === DiffType.ADDED) {
-        additions++
-      }
-      if (l.left.type === DiffType.REMOVED) {
-        deletions++
-      }
-      if (l.right.type === DiffType.REMOVED) {
-        deletions++
-      }
-    })
+    const [deletions, additions] = this.calculateChanges(nodes)
     const totalChanges = deletions + additions
 
     const percentageAddition = Math.round((additions / totalChanges) * 100)
