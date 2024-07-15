@@ -1,6 +1,6 @@
 {
   "name": "react-diff-viewer-continued",
-  "version": "4.0.3",
+  "version": "4.0.4",
   "private": false,
   "description": "Continuation of a simple and beautiful text diff viewer component made with diff and React",
   "keywords": [

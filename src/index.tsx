@@ -404,6 +404,7 @@ class DiffViewer extends React.Component<
               LineNumberPrefix.RIGHT,
               right.value,
               right.lineNumber,
+              LineNumberPrefix.RIGHT,
             )}
           </tr>
         </React.Fragment>
