@@ -1,5 +1,4 @@
-import * as diff from 'diff';
-import { type } from 'os';
+import * as diff from "diff";
 
 const jsDiff: { [key: string]: any } = diff;
 
@@ -7,19 +6,19 @@ export enum DiffType {
   DEFAULT = 0,
   ADDED = 1,
   REMOVED = 2,
-  CHANGED = 3
+  CHANGED = 3,
 }
 
 // See https://github.com/kpdecker/jsdiff/tree/v4.0.1#api for more info on the below JsDiff methods
 export enum DiffMethod {
-  CHARS = 'diffChars',
-  WORDS = 'diffWords',
-  WORDS_WITH_SPACE = 'diffWordsWithSpace',
-  LINES = 'diffLines',
-  TRIMMED_LINES = 'diffTrimmedLines',
-  SENTENCES = 'diffSentences',
-  CSS = 'diffCss',
-  JSON = 'diffJson',
+  CHARS = "diffChars",
+  WORDS = "diffWords",
+  WORDS_WITH_SPACE = "diffWordsWithSpace",
+  LINES = "diffLines",
+  TRIMMED_LINES = "diffTrimmedLines",
+  SENTENCES = "diffSentences",
+  CSS = "diffCss",
+  JSON = "diffJson",
 }
 
 export interface DiffInformation {
@@ -58,9 +57,9 @@ export interface JsDiffChangeObject {
  * @param value Diff text from the js diff module.
  */
 const constructLines = (value: string): string[] => {
-  if (value === '') return [];
+  if (value === "") return [];
 
-  const lines = value.replace(/\n$/, '').split('\n');
+  const lines = value.replace(/\n$/, "").split("\n");
 
   return lines;
 };
@@ -74,11 +73,14 @@ const constructLines = (value: string): string[] => {
  * @param compareMethod JsDiff text diff method from https://github.com/kpdecker/jsdiff/tree/v4.0.1#api
  */
 const computeDiff = (
-  oldValue: string | Object,
-  newValue: string | Object,
-  compareMethod: DiffMethod | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
+  oldValue: string | Record<string, unknown>,
+  newValue: string | Record<string, unknown>,
+  compareMethod:
+    | DiffMethod
+    | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
 ): ComputedDiffInformation => {
-  const compareFunc = (typeof(compareMethod) === 'string') ? jsDiff[compareMethod] : compareMethod
+  const compareFunc =
+    typeof compareMethod === "string" ? jsDiff[compareMethod] : compareMethod;
   const diffArray: JsDiffChangeObject[] = compareFunc(oldValue, newValue);
   const computedDiff: ComputedDiffInformation = {
     left: [],
@@ -123,26 +125,24 @@ const computeDiff = (
  * @param showLines lines that are always shown, regardless of diff
  */
 const computeLineInformation = (
-  oldString: string | Object,
-  newString: string | Object,
-  disableWordDiff: boolean = false,
-  lineCompareMethod: DiffMethod | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
-  linesOffset: number = 0,
+  oldString: string | Record<string, unknown>,
+  newString: string | Record<string, unknown>,
+  disableWordDiff = false,
+  lineCompareMethod:
+    | DiffMethod
+    | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
+  linesOffset = 0,
   showLines: string[] = [],
 ): ComputedLineInformation => {
   let diffArray: Diff.Change[] = [];
 
   // Use diffLines for strings, and diffJson for objects...
-  if (typeof oldString === 'string' && typeof newString === 'string') {
-    diffArray = diff.diffLines(
-      oldString,
-      newString,
-      {
-        newlineIsToken: false,
-        ignoreWhitespace: false,
-        ignoreCase: false,
-      },
-    );
+  if (typeof oldString === "string" && typeof newString === "string") {
+    diffArray = diff.diffLines(oldString, newString, {
+      newlineIsToken: false,
+      ignoreWhitespace: false,
+      ignoreCase: false,
+    });
   } else {
     diffArray = diff.diffJson(oldString, newString);
   }
@@ -173,18 +173,18 @@ const computeLineInformation = (
           return undefined;
         }
         if (added || removed) {
-          let countAsChange = true
+          let countAsChange = true;
           if (removed) {
             leftLineNumber += 1;
             left.lineNumber = leftLineNumber;
             left.type = DiffType.REMOVED;
-            left.value = line || ' ';
+            left.value = line || " ";
             // When the current line is of type REMOVED, check the next item in
             // the diff array whether it is of type ADDED. If true, the current
             // diff will be marked as both REMOVED and ADDED. Meaning, the
             // current line is a modification.
             const nextDiff = diffArray[diffIndex + 1];
-            if (nextDiff && nextDiff.added) {
+            if (nextDiff?.added) {
               const nextDiffLines = constructLines(nextDiff.value)[lineIndex];
               if (nextDiffLines) {
                 const nextDiffLineInfo = getLineInformation(
@@ -209,7 +209,7 @@ const computeLineInformation = (
                 right.lineNumber = lineNumber;
                 if (left.value === rightValue) {
                   // The new value is exactly the same as the old
-                  countAsChange = false
+                  countAsChange = false;
                   right.type = 0;
                   left.type = 0;
                   right.value = rightValue;
@@ -221,9 +221,9 @@ const computeLineInformation = (
                     right.value = rightValue;
                   } else {
                     const computedDiff = computeDiff(
-                        line,
-                        rightValue as string,
-                        lineCompareMethod
+                      line,
+                      rightValue as string,
+                      lineCompareMethod,
                     );
                     right.value = computedDiff.right;
                     left.value = computedDiff.left;
@@ -254,8 +254,12 @@ const computeLineInformation = (
           right.value = line;
         }
 
-        if (showLines?.includes(`L-${left.lineNumber}`) || showLines?.includes(`R-${right.lineNumber}`) && !diffLines.includes(counter)) {
-          diffLines.push(counter)
+        if (
+          showLines?.includes(`L-${left.lineNumber}`) ||
+          (showLines?.includes(`R-${right.lineNumber}`) &&
+            !diffLines.includes(counter))
+        ) {
+          diffLines.push(counter);
         }
 
         if (!evaluateOnlyFirstLine) {
@@ -265,7 +269,6 @@ const computeLineInformation = (
       })
       .filter(Boolean);
   };
-
 
   diffArray.forEach(({ added, removed, value }: diff.Change, index): void => {
     lineInformation = [

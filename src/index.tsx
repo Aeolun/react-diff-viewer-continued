@@ -1,28 +1,37 @@
-import * as React from 'react';
-import {ReactElement, JSX} from 'react';
-import cn from 'classnames';
+import cn from "classnames";
+import * as React from "react";
+import type { JSX, ReactElement } from "react";
 
-import {computeLineInformation, DiffInformation, DiffMethod, DiffType, LineInformation,} from './compute-lines';
-import { Change } from 'diff';
-import computeStyles, {ReactDiffViewerStyles, ReactDiffViewerStylesOverride,} from './styles';
-import {Block, computeHiddenBlocks} from "./compute-hidden-blocks";
-import {Expand} from "./expand";
-import memoize from 'memoize-one';
+import type { Change } from "diff";
+import memoize from "memoize-one";
+import { type Block, computeHiddenBlocks } from "./compute-hidden-blocks";
+import {
+  type DiffInformation,
+  DiffMethod,
+  DiffType,
+  type LineInformation,
+  computeLineInformation,
+} from "./compute-lines";
+import { Expand } from "./expand";
+import computeStyles, {
+  type ReactDiffViewerStyles,
+  type ReactDiffViewerStylesOverride,
+} from "./styles";
 
-import {Fold} from "./fold";
+import { Fold } from "./fold";
 
-type IntrinsicElements = JSX.IntrinsicElements
+type IntrinsicElements = JSX.IntrinsicElements;
 
 export enum LineNumberPrefix {
-  LEFT = 'L',
-  RIGHT = 'R',
+  LEFT = "L",
+  RIGHT = "R",
 }
 
 export interface ReactDiffViewerProps {
   // Old value to compare.
-  oldValue: string | Object;
+  oldValue: string | Record<string, unknown>;
   // New value to compare.
-  newValue: string | Object;
+  newValue: string | Record<string, unknown>;
   // Enable/Disable split view.
   splitView?: boolean;
   // Set line Offset
@@ -38,7 +47,7 @@ export interface ReactDiffViewerProps {
   /**
    * Show the lines indicated here. Specified as L20 or R18 for respectively line 20 on the left or line 18 on the right.
    */
-  alwaysShowLines?: string[]
+  alwaysShowLines?: string[];
   // Show only diff between the two values.
   showDiffOnly?: boolean;
   // Render prop to format final string before displaying them in the UI.
@@ -78,14 +87,14 @@ export interface ReactDiffViewerProps {
   leftTitle?: string | ReactElement;
   // Title for left column
   rightTitle?: string | ReactElement;
-  	// Nonce
-	nonce?: string;
+  // Nonce
+  nonce?: string;
 }
 
 export interface ReactDiffViewerState {
   // Array holding the expanded code folding.
   expandedBlocks?: number[];
-  noSelect?: 'left' | 'right'
+  noSelect?: "left" | "right";
 }
 
 class DiffViewer extends React.Component<
@@ -95,8 +104,8 @@ class DiffViewer extends React.Component<
   private styles: ReactDiffViewerStyles;
 
   public static defaultProps: ReactDiffViewerProps = {
-    oldValue: '',
-    newValue: '',
+    oldValue: "",
+    newValue: "",
     splitView: true,
     highlightLines: [],
     disableWordDiff: false,
@@ -107,7 +116,7 @@ class DiffViewer extends React.Component<
     showDiffOnly: true,
     useDarkTheme: false,
     linesOffset: 0,
-    nonce: '',
+    nonce: "",
   };
 
   public constructor(props: ReactDiffViewerProps) {
@@ -182,10 +191,12 @@ class DiffViewer extends React.Component<
     renderer?: (chunk: string) => JSX.Element,
   ): ReactElement[] => {
     return diffArray.map((wordDiff, i): JSX.Element => {
-      const content = renderer ? renderer(wordDiff.value as string) : wordDiff.value
-      if (typeof content !== 'string') return;
+      const content = renderer
+        ? renderer(wordDiff.value as string)
+        : wordDiff.value;
+      if (typeof content !== "string") return;
 
-      return wordDiff.type === DiffType.ADDED ?
+      return wordDiff.type === DiffType.ADDED ? (
         <ins
           key={i}
           className={cn(this.styles.wordDiff, {
@@ -194,20 +205,20 @@ class DiffViewer extends React.Component<
         >
           {content}
         </ins>
-      : wordDiff.type === DiffType.REMOVED ? <del
+      ) : wordDiff.type === DiffType.REMOVED ? (
+        <del
           key={i}
           className={cn(this.styles.wordDiff, {
             [this.styles.wordRemoved]: wordDiff.type === DiffType.REMOVED,
           })}
         >
           {content}
-        </del> : <span
-          key={i}
-          className={cn(this.styles.wordDiff)}
-        >
+        </del>
+      ) : (
+        <span key={i} className={cn(this.styles.wordDiff)}>
           {content}
         </span>
-    ;
+      );
     });
   };
 
@@ -241,7 +252,7 @@ class DiffViewer extends React.Component<
     const removed = type === DiffType.REMOVED;
     const changed = type === DiffType.CHANGED;
     let content;
-    const hasWordDiff = Array.isArray(value)
+    const hasWordDiff = Array.isArray(value);
     if (hasWordDiff) {
       content = this.renderWordDiff(value, this.props.renderContent);
     } else if (this.props.renderContent) {
@@ -250,11 +261,11 @@ class DiffViewer extends React.Component<
       content = value;
     }
 
-    let ElementType: keyof IntrinsicElements = 'div'
+    let ElementType: keyof IntrinsicElements = "div";
     if (added && !hasWordDiff) {
-      ElementType = 'ins'
+      ElementType = "ins";
     } else if (removed && !hasWordDiff) {
-      ElementType = 'del'
+      ElementType = "del";
     }
 
     return (
@@ -313,8 +324,8 @@ class DiffViewer extends React.Component<
           })}
         >
           <pre>
-            {added && '+'}
-            {removed && '-'}
+            {added && "+"}
+            {removed && "-"}
           </pre>
         </td>
         <td
@@ -328,15 +339,25 @@ class DiffViewer extends React.Component<
             right: prefix === LineNumberPrefix.RIGHT,
           })}
           onMouseDown={() => {
-            const elements = document.getElementsByClassName(prefix === LineNumberPrefix.LEFT ? 'right' : 'left')
-            for(let i = 0; i < elements.length; i ++) {
-              const element = elements.item(i)
-              element.classList.add(this.styles.noSelect)
+            const elements = document.getElementsByClassName(
+              prefix === LineNumberPrefix.LEFT ? "right" : "left",
+            );
+            for (let i = 0; i < elements.length; i++) {
+              const element = elements.item(i);
+              element.classList.add(this.styles.noSelect);
             }
           }}
-          title={added && !hasWordDiff ? "Added line" : removed && !hasWordDiff ? "Removed line" : undefined}
+          title={
+            added && !hasWordDiff
+              ? "Added line"
+              : removed && !hasWordDiff
+                ? "Removed line"
+                : undefined
+          }
         >
-          <ElementType className={this.styles.contentText}>{content}</ElementType>
+          <ElementType className={this.styles.contentText}>
+            {content}
+          </ElementType>
         </td>
       </>
     );
@@ -452,7 +473,7 @@ class DiffViewer extends React.Component<
    * @param id Cold fold block id.
    */
   private onBlockClickProxy =
-    (id: number): any =>
+    (id: number): (() => void) =>
     (): void =>
       this.onBlockExpand(id);
 
@@ -479,13 +500,20 @@ class DiffViewer extends React.Component<
         rightBlockLineNumber,
       )
     ) : (
-      <pre className={this.styles.codeFoldContent}>Expand {num} lines ...</pre>
+      <span className={this.styles.codeFoldContent}>
+        Expand {num} lines ...
+      </span>
     );
     const content = (
       <td className={this.styles.codeFoldContentContainer}>
-        <a onClick={this.onBlockClickProxy(blockNumber)} tabIndex={0}>
+        <button
+          type="button"
+          className={this.styles.codeFoldExpandButton}
+          onClick={this.onBlockClickProxy(blockNumber)}
+          tabIndex={0}
+        >
           {message}
-        </a>
+        </button>
       </td>
     );
     const isUnifiedViewWithoutLineNumbers = !splitView && !hideLineNumbers;
@@ -523,12 +551,14 @@ class DiffViewer extends React.Component<
     );
   };
 
-
-
   /**
    * Generates the entire diff view.
    */
-  private renderDiff = (): { diffNodes: ReactElement[], lineInformation: LineInformation[], blocks: Block[] } => {
+  private renderDiff = (): {
+    diffNodes: ReactElement[];
+    lineInformation: LineInformation[];
+    blocks: Block[];
+  } => {
     const {
       oldValue,
       newValue,
@@ -543,7 +573,7 @@ class DiffViewer extends React.Component<
       disableWordDiff,
       compareMethod,
       linesOffset,
-      this.props.alwaysShowLines
+      this.props.alwaysShowLines,
     );
 
     const extraLines =
@@ -551,17 +581,23 @@ class DiffViewer extends React.Component<
         ? 0
         : Math.round(this.props.extraLinesSurroundingDiff);
 
-    const { lineBlocks, blocks } = computeHiddenBlocks(lineInformation, diffLines, extraLines)
+    const { lineBlocks, blocks } = computeHiddenBlocks(
+      lineInformation,
+      diffLines,
+      extraLines,
+    );
 
     const diffNodes = lineInformation.map(
       (line: LineInformation, lineIndex: number) => {
-
         if (this.props.showDiffOnly) {
-          const blockIndex = lineBlocks[lineIndex]
+          const blockIndex = lineBlocks[lineIndex];
 
           if (blockIndex !== undefined) {
             const lastLineOfBlock = blocks[blockIndex].endLine === lineIndex;
-            if (!this.state.expandedBlocks.includes(blockIndex) && lastLineOfBlock) {
+            if (
+              !this.state.expandedBlocks.includes(blockIndex) &&
+              lastLineOfBlock
+            ) {
               return (
                 <React.Fragment key={lineIndex}>
                   {this.renderSkippedLineIndicator(
@@ -572,8 +608,9 @@ class DiffViewer extends React.Component<
                   )}
                 </React.Fragment>
               );
-            } else if (!this.state.expandedBlocks.includes(blockIndex)) {
-              return null
+            }
+            if (!this.state.expandedBlocks.includes(blockIndex)) {
+              return null;
             }
           }
         }
@@ -586,7 +623,7 @@ class DiffViewer extends React.Component<
     return {
       diffNodes,
       blocks,
-      lineInformation
+      lineInformation,
     };
   };
 
@@ -603,8 +640,11 @@ class DiffViewer extends React.Component<
       nonce,
     } = this.props;
 
-    if (typeof(compareMethod) === 'string' && compareMethod !== DiffMethod.JSON) {
-      if (typeof oldValue !== 'string' || typeof newValue !== 'string') {
+    if (
+      typeof compareMethod === "string" &&
+      compareMethod !== DiffMethod.JSON
+    ) {
+      if (typeof oldValue !== "string" || typeof newValue !== "string") {
         throw Error('"oldValue" and "newValue" should be strings');
       }
     }
@@ -625,43 +665,64 @@ class DiffViewer extends React.Component<
       colSpanOnInlineView += 1;
     }
 
-    let deletions = 0, additions = 0
-    nodes.lineInformation.forEach((l) => {
+    let deletions = 0;
+    let additions = 0;
+    for (const l of nodes.lineInformation) {
       if (l.left.type === DiffType.ADDED) {
-        additions++
+        additions++;
       }
       if (l.right.type === DiffType.ADDED) {
-        additions++
+        additions++;
       }
       if (l.left.type === DiffType.REMOVED) {
-        deletions++
+        deletions++;
       }
       if (l.right.type === DiffType.REMOVED) {
-        deletions++
-      }
-    })
-    const totalChanges = deletions + additions
-
-    const percentageAddition = Math.round((additions / totalChanges) * 100)
-    const blocks: ReactElement[] = []
-    for(let i = 0; i < 5; i++) {
-      if (percentageAddition > i * 20) {
-        blocks.push(<span key={i} className={cn(this.styles.block, this.styles.blockAddition)} />)
-      } else {
-        blocks.push(<span key={i} className={cn(this.styles.block, this.styles.blockDeletion)} />)
+        deletions++;
       }
     }
-    const allExpanded = this.state.expandedBlocks.length === nodes.blocks.length
+    const totalChanges = deletions + additions;
+
+    const percentageAddition = Math.round((additions / totalChanges) * 100);
+    const blocks: ReactElement[] = [];
+    for (let i = 0; i < 5; i++) {
+      if (percentageAddition > i * 20) {
+        blocks.push(
+          <span
+            key={i}
+            className={cn(this.styles.block, this.styles.blockAddition)}
+          />,
+        );
+      } else {
+        blocks.push(
+          <span
+            key={i}
+            className={cn(this.styles.block, this.styles.blockDeletion)}
+          />,
+        );
+      }
+    }
+    const allExpanded =
+      this.state.expandedBlocks.length === nodes.blocks.length;
 
     return (
       <div>
-        <div className={this.styles.summary} role={'banner'}>
-          <a style={{cursor: 'pointer'}} onClick={() => {
-            this.setState({
-              expandedBlocks: allExpanded ? [] : nodes.blocks.map(b => b.index)
-            })
-          }}>{allExpanded ? <Fold/> : <Expand/>}</a> {totalChanges}
-          <div style={{display: 'flex', gap: '1px'}}>{blocks}</div>
+        <div className={this.styles.summary} role={"banner"}>
+          <button
+            type={"button"}
+            className={this.styles.allExpandButton}
+            onClick={() => {
+              this.setState({
+                expandedBlocks: allExpanded
+                  ? []
+                  : nodes.blocks.map((b) => b.index),
+              });
+            }}
+          >
+            {allExpanded ? <Fold /> : <Expand />}
+          </button>{" "}
+          {totalChanges}
+          <div style={{ display: "flex", gap: "1px" }}>{blocks}</div>
           {this.props.summary ? <span>{this.props.summary}</span> : null}
         </div>
         <table
@@ -669,44 +730,61 @@ class DiffViewer extends React.Component<
             [this.styles.splitView]: splitView,
           })}
           onMouseUp={() => {
-            const elements = document.getElementsByClassName('right')
-            for(let i = 0; i < elements.length; i ++) {
-              const element = elements.item(i)
-              element.classList.remove(this.styles.noSelect)
+            const elements = document.getElementsByClassName("right");
+            for (let i = 0; i < elements.length; i++) {
+              const element = elements.item(i);
+              element.classList.remove(this.styles.noSelect);
             }
-            const elementsLeft = document.getElementsByClassName('left')
-            for(let i = 0; i < elementsLeft.length; i ++) {
-              const element = elementsLeft.item(i)
-              element.classList.remove(this.styles.noSelect)
+            const elementsLeft = document.getElementsByClassName("left");
+            for (let i = 0; i < elementsLeft.length; i++) {
+              const element = elementsLeft.item(i);
+              element.classList.remove(this.styles.noSelect);
             }
           }}
         >
           <tbody>
-          <tr>
-            {!this.props.hideLineNumbers ? <td width={'50px'}></td> : null }
-            {!splitView && !this.props.hideLineNumbers ? <td width={'50px'}></td> : null}
-            {this.props.renderGutter ? <td width={'50px'}></td> : null }
-            <td width={'28px'}></td>
-            <td width={'100%'}></td>
-            {splitView ? <>
-              {!this.props.hideLineNumbers ? <td width={'50px'}></td> : null }
-              {this.props.renderGutter ? <td width={'50px'}></td> : null}
-            <td width={'28px'}></td>
-            <td width={'100%'}></td></> : null }
-          </tr>
-          { leftTitle || rightTitle ? <tr>
-            <td colSpan={
-              (splitView ? colSpanOnSplitView : colSpanOnInlineView)
-            } className={cn(this.styles.titleBlock, this.styles.column)}
-                role={'columnheader'}>
-              {leftTitle ? <pre className={this.styles.contentText}>{leftTitle}</pre> : null}
-            </td>
-            {splitView ? <td colSpan={colSpanOnSplitView} className={cn(this.styles.titleBlock, this.styles.column)}
-                role={'columnheader'}>
-              {rightTitle ? <pre className={this.styles.contentText}>{rightTitle}</pre> : null}
-            </td> : null }
-          </tr> : null }
-          {nodes.diffNodes}
+            <tr>
+              {!this.props.hideLineNumbers ? <td width={"50px"} /> : null}
+              {!splitView && !this.props.hideLineNumbers ? (
+                <td width={"50px"} />
+              ) : null}
+              {this.props.renderGutter ? <td width={"50px"} /> : null}
+              <td width={"28px"} />
+              <td width={"100%"} />
+              {splitView ? (
+                <>
+                  {!this.props.hideLineNumbers ? <td width={"50px"} /> : null}
+                  {this.props.renderGutter ? <td width={"50px"} /> : null}
+                  <td width={"28px"} />
+                  <td width={"100%"} />
+                </>
+              ) : null}
+            </tr>
+            {leftTitle || rightTitle ? (
+              <tr>
+                <th
+                  colSpan={splitView ? colSpanOnSplitView : colSpanOnInlineView}
+                  className={cn(this.styles.titleBlock, this.styles.column)}
+                >
+                  {leftTitle ? (
+                    <pre className={this.styles.contentText}>{leftTitle}</pre>
+                  ) : null}
+                </th>
+                {splitView ? (
+                  <th
+                    colSpan={colSpanOnSplitView}
+                    className={cn(this.styles.titleBlock, this.styles.column)}
+                  >
+                    {rightTitle ? (
+                      <pre className={this.styles.contentText}>
+                        {rightTitle}
+                      </pre>
+                    ) : null}
+                  </th>
+                ) : null}
+              </tr>
+            ) : null}
+            {nodes.diffNodes}
           </tbody>
         </table>
       </div>
@@ -715,5 +793,5 @@ class DiffViewer extends React.Component<
 }
 
 export default DiffViewer;
-export { DiffMethod}
-export type {ReactDiffViewerStylesOverride};
+export { DiffMethod };
+export type { ReactDiffViewerStylesOverride };

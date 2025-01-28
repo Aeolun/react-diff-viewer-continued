@@ -75,8 +75,8 @@ class Example extends Component<{}, ExampleState> {
   };
 
   public render(): JSX.Element {
-    let oldValue: string | object = ''
-    let newValue: string | object = '';
+    let oldValue: string | Record<string, unknown> = ''
+    let newValue: string | Record<string, unknown> = '';
     if (this.state.dataType === 'json') {
       oldValue = oldJson
       newValue = newJson
