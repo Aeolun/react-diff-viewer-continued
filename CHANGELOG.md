@@ -1,3 +1,12 @@
+## [4.0.4](https://github.com/aeolun/react-diff-viewer-continued/compare/v4.0.3...v4.0.4) (2025-01-28)
+
+
+### Bug Fixes
+
+* added line number for inline view onLineNumberClick ([0e92dfe](https://github.com/aeolun/react-diff-viewer-continued/commit/0e92dfee2102b42bdd0c51af57c66b0152ad2186))
+* fix several type issues and update packages ([23aa832](https://github.com/aeolun/react-diff-viewer-continued/commit/23aa83222e85d303b939eb20699348e449a9174f))
+* line break anywhere ([17c51e6](https://github.com/aeolun/react-diff-viewer-continued/commit/17c51e62afd6ffcacee2fe731f1ff0ee44c08e37))
+
 ## [4.0.3](https://github.com/aeolun/react-diff-viewer-continued/compare/v4.0.2...v4.0.3) (2024-05-23)
 
 
