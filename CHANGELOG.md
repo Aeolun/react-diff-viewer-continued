@@ -1,3 +1,10 @@
+## [4.0.5](https://github.com/aeolun/react-diff-viewer-continued/compare/v4.0.4...v4.0.5) (2025-01-31)
+
+
+### Bug Fixes
+
+* modify imports for proper esm resolution ([7fda63a](https://github.com/aeolun/react-diff-viewer-continued/commit/7fda63afae8bcd98547c8bdff569d02256821b2d))
+
 ## [4.0.4](https://github.com/aeolun/react-diff-viewer-continued/compare/v4.0.3...v4.0.4) (2025-01-28)
 
 
