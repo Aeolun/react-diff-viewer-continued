@@ -4,21 +4,21 @@ import type { JSX, ReactElement } from "react";
 
 import type { Change } from "diff";
 import memoize from "memoize-one";
-import { type Block, computeHiddenBlocks } from "./compute-hidden-blocks";
+import { type Block, computeHiddenBlocks } from "./compute-hidden-blocks.js";
 import {
   type DiffInformation,
   DiffMethod,
   DiffType,
   type LineInformation,
   computeLineInformation,
-} from "./compute-lines";
-import { Expand } from "./expand";
+} from "./compute-lines.js";
+import { Expand } from "./expand.js";
 import computeStyles, {
   type ReactDiffViewerStyles,
   type ReactDiffViewerStylesOverride,
-} from "./styles";
+} from "./styles.js";
 
-import { Fold } from "./fold";
+import { Fold } from "./fold.js";
 
 type IntrinsicElements = JSX.IntrinsicElements;
 
