@@ -194,7 +194,6 @@ class DiffViewer extends React.Component<
       const content = renderer
         ? renderer(wordDiff.value as string)
         : wordDiff.value;
-      if (typeof content !== "string") return;
 
       return wordDiff.type === DiffType.ADDED ? (
         <ins
