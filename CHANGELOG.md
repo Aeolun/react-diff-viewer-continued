@@ -1,3 +1,11 @@
+## [4.0.6](https://github.com/aeolun/react-diff-viewer-continued/compare/v4.0.5...v4.0.6) (2025-05-13)
+
+
+### Bug Fixes
+
+* allow non-string rendered contents ([a0ab52d](https://github.com/aeolun/react-diff-viewer-continued/commit/a0ab52d3d064297d1957c7fb65f9742f53a191a7))
+* fixup [#68](https://github.com/aeolun/react-diff-viewer-continued/issues/68) for non-string wordDiff.value ([3678e02](https://github.com/aeolun/react-diff-viewer-continued/commit/3678e020855f0fec8f15084291cb5adc54a2c009))
+
 ## [4.0.5](https://github.com/aeolun/react-diff-viewer-continued/compare/v4.0.4...v4.0.5) (2025-01-31)
 
 
