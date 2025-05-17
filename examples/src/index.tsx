@@ -26,6 +26,8 @@ interface ExampleState {
   compareMethod?: DiffMethod;
   dataType: string;
   customGutter?: boolean;
+  infiniteLoading?: boolean;
+  loadingText?: boolean
 }
 
 const P = (window as any).Prism;
@@ -42,7 +44,9 @@ class Example extends Component<{}, ExampleState> {
       customGutter: true,
       enableSyntaxHighlighting: true,
       dataType: 'javascript',
-      compareMethod: DiffMethod.CHARS
+      compareMethod: DiffMethod.CHARS,
+      infiniteLoading: true,
+      loadingText: true
     };
   }
 
@@ -217,6 +221,36 @@ class Example extends Component<{}, ExampleState> {
               <span>Line Numbers</span>
             </div>
             <div>
+              <label className={'switch'}>
+                <input
+                  type="checkbox"
+                  checked={this.state.infiniteLoading}
+                  onChange={() => {
+                    this.setState({
+                      infiniteLoading: !this.state.infiniteLoading,
+                    });
+                  }}
+                />
+                <span className="slider round"></span>
+              </label>
+              <span>Infinite Loading</span>
+            </div>
+            <div>
+              <label className={'switch'}>
+                <input
+                  type="checkbox"
+                  checked={this.state.loadingText}
+                  onChange={() => {
+                    this.setState({
+                      loadingText: !this.state.loadingText,
+                    });
+                  }}
+                />
+                <span className="slider round"></span>
+              </label>
+              <span>Show Loading Text</span>
+            </div>
+            <div>
               <label className={'select'}>
                 <select
                   value={this.state.dataType}
@@ -288,6 +322,23 @@ class Example extends Component<{}, ExampleState> {
             summary={this.state.compareMethod === DiffMethod.JSON ? 'package.json' : 'webpack.config.js'}
             leftTitle={this.state.columnHeaders ? `master@2178133 - pushed 2 hours ago.` : undefined}
             rightTitle={this.state.columnHeaders ? `master@64207ee - pushed 13 hours ago.` : undefined}
+            infiniteLoading={this.state.infiniteLoading && {
+              pageSize: 20,
+              containerHeight: '70vh'
+            }}
+            loadingText={this.state.loadingText && (() => (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                position: 'absolute',
+                zIndex: '1',
+                background: '#00000061'
+              }}>
+                <p style={{ position: 'absolute', top: '50%', right: '50%', transform: 'translate(50%,-50%)' }}>
+                  Loading Content...
+                </p>
+              </div>
+            ))}
           />
         </div>
         <footer>

@@ -1,6 +1,6 @@
 import cn from "classnames";
 import * as React from "react";
-import type { JSX, ReactElement } from "react";
+import type { JSX, ReactElement, RefObject } from "react";
 
 import type { Change } from "diff";
 import memoize from "memoize-one";
@@ -10,7 +10,7 @@ import {
   DiffMethod,
   DiffType,
   type LineInformation,
-  computeLineInformation,
+  computeLineInformationWorker,
 } from "./compute-lines.js";
 import { Expand } from "./expand.js";
 import computeStyles, {
@@ -25,6 +25,17 @@ type IntrinsicElements = JSX.IntrinsicElements;
 export enum LineNumberPrefix {
   LEFT = "L",
   RIGHT = "R",
+}
+
+export interface InfiniteLoadingProps {
+  pageSize: number,
+  containerHeight: string
+}
+
+export interface ComputedDiffResult {
+  lineInformation: LineInformation[];
+  lineBlocks: Record<number, number>;
+  blocks: Block[];
 }
 
 export interface ReactDiffViewerProps {
@@ -89,12 +100,24 @@ export interface ReactDiffViewerProps {
   rightTitle?: string | ReactElement;
   // Nonce
   nonce?: string;
+  /**
+   * to enable infiniteLoading for better performance
+   */
+  infiniteLoading?: InfiniteLoadingProps;
+  /**
+   * to display loading element when diff is being computed
+   */
+  loadingText?: () => ReactElement
 }
 
 export interface ReactDiffViewerState {
   // Array holding the expanded code folding.
   expandedBlocks?: number[];
   noSelect?: "left" | "right";
+  scrollableContainerRef: RefObject<HTMLDivElement>
+  pageNumber: number
+  computedDiffResult: Record<string, ComputedDiffResult>
+  isLoading: boolean
 }
 
 class DiffViewer extends React.Component<
@@ -125,6 +148,10 @@ class DiffViewer extends React.Component<
     this.state = {
       expandedBlocks: [],
       noSelect: undefined,
+      scrollableContainerRef: React.createRef(),
+      pageNumber: 1,
+      computedDiffResult: {},
+      isLoading: false
     };
   }
 
@@ -194,7 +221,7 @@ class DiffViewer extends React.Component<
       const content = renderer
         ? renderer(wordDiff.value as string)
         : wordDiff.value;
-      if (typeof content !== "string") return;
+      if (Array.isArray(content)) return;
 
       return wordDiff.type === DiffType.ADDED ? (
         <ins
@@ -552,22 +579,62 @@ class DiffViewer extends React.Component<
   };
 
   /**
-   * Generates the entire diff view.
+   * 
+   * Generates a unique cache key based on the current props used in diff computation.
+   * 
+   * This key is used to memoize results and avoid recomputation for the same inputs.
+   * @returns A stringified JSON key representing the current diff settings and input values.
+   *
    */
-  private renderDiff = (): {
-    diffNodes: ReactElement[];
-    lineInformation: LineInformation[];
-    blocks: Block[];
-  } => {
+  private getMemoisedKey = () => {
     const {
       oldValue,
       newValue,
-      splitView,
       disableWordDiff,
       compareMethod,
       linesOffset,
+      alwaysShowLines,
+      extraLinesSurroundingDiff,
     } = this.props;
-    const { lineInformation, diffLines } = computeLineInformation(
+
+    return JSON.stringify({
+      oldValue,
+      newValue,
+      disableWordDiff,
+      compareMethod,
+      linesOffset,
+      alwaysShowLines,
+      extraLinesSurroundingDiff,
+    });
+  }
+
+  /**
+   * Computes and memoizes the diff result between `oldValue` and `newValue`.
+   * 
+   * If a memoized result exists for the current input configuration, it uses that.
+   * Otherwise, it runs the diff logic in a Web Worker to avoid blocking the UI.
+   * It also computes hidden line blocks for collapsing unchanged sections,
+   * and stores the result in the local component state.
+   */
+  private memoisedCompute = async () => {
+    const {
+      oldValue,
+      newValue,
+      disableWordDiff,
+      compareMethod,
+      linesOffset
+    } = this.props;
+
+    const cacheKey = this.getMemoisedKey()
+    if (!!this.state.computedDiffResult[cacheKey]) {
+      this.setState((prev) => ({
+        ...prev,
+        isLoading: false
+      }))
+      return;
+    }
+
+    const { lineInformation, diffLines } = await computeLineInformationWorker(
       oldValue,
       newValue,
       disableWordDiff,
@@ -587,7 +654,51 @@ class DiffViewer extends React.Component<
       extraLines,
     );
 
-    const diffNodes = lineInformation.map(
+    this.state.computedDiffResult[cacheKey] = { lineInformation, lineBlocks, blocks }
+    this.setState((prev) => ({
+      ...prev,
+      computedDiffResult: this.state.computedDiffResult,
+      isLoading: false,
+      pageNumber: 1
+    }))
+  }
+
+  /**
+   * Handles scroll events on the scrollable container.
+   * 
+   * When the user scrolls past 80% of the total scroll height,
+   * it increments the `pageNumber` in the component's state.
+   * This is used to implement infinite scroll.
+   */
+  private onScroll = () => {
+    const container = this.state.scrollableContainerRef.current
+    if (container && container.scrollTop + container.clientHeight >= (0.8 * container.scrollHeight)) {
+      this.setState((prev) => ({ ...prev, pageNumber: prev.pageNumber + 1 }));
+    }
+  }
+
+  /**
+   * Generates the entire diff view.
+   */
+  private renderDiff = (): {
+    diffNodes: ReactElement[];
+    lineInformation: LineInformation[];
+    blocks: Block[];
+  } => {
+    const { splitView, infiniteLoading } = this.props;
+    const { computedDiffResult, pageNumber } = this.state
+    const cacheKey = this.getMemoisedKey()
+    const { lineInformation = [], lineBlocks = [], blocks = [] } = computedDiffResult[cacheKey] ?? {}
+    let finalLineInformation = [...lineInformation]
+
+    if (infiniteLoading) {
+      finalLineInformation = lineInformation.slice(
+        0,
+        Math.min(infiniteLoading.pageSize * pageNumber, lineInformation.length)
+      )
+    }
+
+    const diffNodes = finalLineInformation.map(
       (line: LineInformation, lineIndex: number) => {
         if (this.props.showDiffOnly) {
           const blockIndex = lineBlocks[lineIndex];
@@ -626,6 +737,32 @@ class DiffViewer extends React.Component<
       lineInformation,
     };
   };
+
+  componentDidUpdate(prevProps: ReactDiffViewerProps) {
+    if (
+      prevProps.oldValue !== this.props.oldValue ||
+      prevProps.newValue !== this.props.newValue ||
+      prevProps.compareMethod !== this.props.compareMethod ||
+      prevProps.disableWordDiff !== this.props.disableWordDiff ||
+      prevProps.linesOffset !== this.props.linesOffset
+    ) {
+      this.setState((prev) => ({
+        ...prev,
+        isLoading: true,
+        pageNumber: 1
+      }))
+      this.memoisedCompute();
+    }
+  }
+
+  componentDidMount() {
+    this.setState((prev) => ({
+      ...prev,
+      isLoading: true,
+      pageNumber: 1
+    }))
+    this.memoisedCompute();
+  }
 
   public render = (): ReactElement => {
     const {
@@ -705,8 +842,18 @@ class DiffViewer extends React.Component<
     const allExpanded =
       this.state.expandedBlocks.length === nodes.blocks.length;
 
+    const LoadingText = this.props.loadingText;
+    const scrollDivStyle = this.props.infiniteLoading ? {
+      overflow: 'scroll',
+      height: this.props.infiniteLoading.containerHeight
+    } : {}
+
     return (
-      <div>
+      <div
+        style={{ ...scrollDivStyle, position: 'relative' }}
+        onScroll={this.onScroll}
+        ref={this.state.scrollableContainerRef}
+      >
         <div className={this.styles.summary} role={"banner"}>
           <button
             type={"button"}
@@ -725,6 +872,7 @@ class DiffViewer extends React.Component<
           <div style={{ display: "flex", gap: "1px" }}>{blocks}</div>
           {this.props.summary ? <span>{this.props.summary}</span> : null}
         </div>
+        {this.state.isLoading && LoadingText && <LoadingText />}
         <table
           className={cn(this.styles.diffContainer, {
             [this.styles.splitView]: splitView,
