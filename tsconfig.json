@@ -2,7 +2,7 @@
   "compilerOptions": {
     "experimentalDecorators": true,
     "jsx": "react-jsx",
-    "module": "commonjs",
+    "module": "ESNext",
     "moduleResolution": "node",
     "noImplicitAny": true,
     "esModuleInterop": true,
