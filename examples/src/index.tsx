@@ -27,7 +27,7 @@ interface ExampleState {
   dataType: string;
   customGutter?: boolean;
   infiniteLoading?: boolean;
-  loadingText?: boolean
+  loadingElement?: boolean
 }
 
 const P = (window as any).Prism;
@@ -46,7 +46,7 @@ class Example extends Component<{}, ExampleState> {
       dataType: 'javascript',
       compareMethod: DiffMethod.CHARS,
       infiniteLoading: true,
-      loadingText: true
+      loadingElement: true
     };
   }
 
@@ -239,10 +239,10 @@ class Example extends Component<{}, ExampleState> {
               <label className={'switch'}>
                 <input
                   type="checkbox"
-                  checked={this.state.loadingText}
+                  checked={this.state.loadingElement}
                   onChange={() => {
                     this.setState({
-                      loadingText: !this.state.loadingText,
+                      loadingElement: !this.state.loadingElement,
                     });
                   }}
                 />
@@ -326,7 +326,7 @@ class Example extends Component<{}, ExampleState> {
               pageSize: 20,
               containerHeight: '70vh'
             }}
-            loadingText={this.state.loadingText && (() => (
+            loadingElement={this.state.loadingElement && (() => (
               <div style={{
                 width: '100%',
                 height: '100%',

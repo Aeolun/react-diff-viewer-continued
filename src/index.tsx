@@ -107,7 +107,7 @@ export interface ReactDiffViewerProps {
   /**
    * to display loading element when diff is being computed
    */
-  loadingText?: () => ReactElement
+  loadingElement?: () => ReactElement
 }
 
 export interface ReactDiffViewerState {
@@ -842,7 +842,7 @@ class DiffViewer extends React.Component<
     const allExpanded =
       this.state.expandedBlocks.length === nodes.blocks.length;
 
-    const LoadingText = this.props.loadingText;
+    const LoadingElement = this.props.loadingElement;
     const scrollDivStyle = this.props.infiniteLoading ? {
       overflow: 'scroll',
       height: this.props.infiniteLoading.containerHeight
@@ -872,7 +872,7 @@ class DiffViewer extends React.Component<
           <div style={{ display: "flex", gap: "1px" }}>{blocks}</div>
           {this.props.summary ? <span>{this.props.summary}</span> : null}
         </div>
-        {this.state.isLoading && LoadingText && <LoadingText />}
+        {this.state.isLoading && LoadingElement && <LoadingElement />}
         <table
           className={cn(this.styles.diffContainer, {
             [this.styles.splitView]: splitView,
