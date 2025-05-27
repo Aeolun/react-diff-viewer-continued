@@ -220,8 +220,10 @@ class DiffViewer extends React.Component<
     return diffArray.map((wordDiff, i): JSX.Element => {
       const content = renderer
         ? renderer(wordDiff.value as string)
-        : wordDiff.value;
-      if (Array.isArray(content)) return;
+        : (typeof wordDiff.value === 'string'
+          ? wordDiff.value
+          // If wordDiff.value is DiffInformation, we don't handle it, unclear why. See c0c99f5712.
+          : undefined);
 
       return wordDiff.type === DiffType.ADDED ? (
         <ins
