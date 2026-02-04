@@ -265,15 +265,7 @@ Also this info`;
             value: [
               {
                 type: 1,
-                value: "My Updat",
-              },
-              {
-                type: 0,
-                value: "e",
-              },
-              {
-                type: 1,
-                value: "d",
+                value: "My",
               },
               {
                 type: 0,
@@ -281,7 +273,15 @@ Also this info`;
               },
               {
                 type: 1,
-                value: "Name",
+                value: "Up",
+              },
+              {
+                type: 0,
+                value: "d",
+              },
+              {
+                type: 1,
+                value: "ated Name",
               },
             ],
           },
@@ -291,15 +291,7 @@ Also this info`;
             value: [
               {
                 type: 2,
-                value: "H",
-              },
-              {
-                type: 0,
-                value: "e",
-              },
-              {
-                type: 2,
-                value: "llo",
+                value: "Hello",
               },
               {
                 type: 0,
@@ -307,7 +299,11 @@ Also this info`;
               },
               {
                 type: 2,
-                value: "World",
+                value: "Worl",
+              },
+              {
+                type: 0,
+                value: "d",
               },
             ],
           },
@@ -341,15 +337,7 @@ Also this info`;
             value: [
               {
                 type: 1,
-                value: "My",
-              },
-              {
-                type: 0,
-                value: " ",
-              },
-              {
-                type: 1,
-                value: "Updated Name",
+                value: "My Updated Name",
               },
             ],
           },
@@ -359,15 +347,7 @@ Also this info`;
             value: [
               {
                 type: 2,
-                value: "Hello",
-              },
-              {
-                type: 0,
-                value: " ",
-              },
-              {
-                type: 2,
-                value: "World",
+                value: "Hello World",
               },
             ],
           },
@@ -457,6 +437,94 @@ import oldJson from '../examples/src/diff/json/old.json';
 import newJson from '../examples/src/diff/json/new.json';
 import oldYaml from '../examples/src/diff/massive/old.yaml?raw';
 import newYaml from '../examples/src/diff/massive/new.yaml?raw';
+
+describe("JSON string key order preservation", (): void => {
+  it("Should preserve original key order when JSON is passed as strings", (): void => {
+    // JSON with specific key order that matters
+    const oldJson = `{
+  "name": "my-package",
+  "version": "1.0.0",
+  "description": "A test package",
+  "main": "index.js"
+}`;
+
+    const newJson = `{
+  "name": "my-package",
+  "version": "2.0.0",
+  "description": "A test package",
+  "main": "index.js"
+}`;
+
+    const result = computeLineInformation(oldJson, newJson, true, DiffMethod.JSON);
+
+    // Extract the lines from the result
+    const lines = result.lineInformation.map(l => {
+      // Get the value, preferring the left side for context lines
+      const val = l.left?.value || l.right?.value;
+      return typeof val === 'string' ? val.trim() : '';
+    }).filter(Boolean);
+
+    // Key order should be preserved: name, version, description, main
+    const nameIndex = lines.findIndex(l => l.includes('"name"'));
+    const versionIndex = lines.findIndex(l => l.includes('"version"'));
+    const descIndex = lines.findIndex(l => l.includes('"description"'));
+    const mainIndex = lines.findIndex(l => l.includes('"main"'));
+
+    expect(nameIndex).toBeLessThan(versionIndex);
+    expect(versionIndex).toBeLessThan(descIndex);
+    expect(descIndex).toBeLessThan(mainIndex);
+  });
+
+  it("Should identify changes while preserving key order in JSON strings", (): void => {
+    // Completely different key order but same structure
+    const oldJson = `{
+  "zebra": "last",
+  "apple": "first",
+  "middle": "center"
+}`;
+
+    const newJson = `{
+  "zebra": "last",
+  "apple": "modified",
+  "middle": "center"
+}`;
+
+    const result = computeLineInformation(oldJson, newJson, true, DiffMethod.JSON);
+
+    // Should detect the change
+    expect(result.diffLines.length).toBeGreaterThan(0);
+
+    // Key order should match original: zebra, apple, middle
+    const lines = result.lineInformation.map(l => {
+      const val = l.left?.value || l.right?.value;
+      return typeof val === 'string' ? val : '';
+    }).join('\n');
+
+    const zebraPos = lines.indexOf('"zebra"');
+    const applePos = lines.indexOf('"apple"');
+    const middlePos = lines.indexOf('"middle"');
+
+    expect(zebraPos).toBeLessThan(applePos);
+    expect(applePos).toBeLessThan(middlePos);
+  });
+
+  it("Should handle structurally identical JSON strings efficiently", (): void => {
+    // Same content, should be fast path
+    const json = `{
+  "key1": "value1",
+  "key2": "value2",
+  "nested": {
+    "a": 1,
+    "b": 2
+  }
+}`;
+
+    const result = computeLineInformation(json, json, true, DiffMethod.JSON);
+
+    // No differences
+    expect(result.diffLines.length).toBe(0);
+  });
+});
 
 describe("Performance tests", (): void => {
   it("Should handle example JSON files efficiently (structural diff)", (): void => {

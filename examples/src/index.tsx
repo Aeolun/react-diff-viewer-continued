@@ -1,5 +1,5 @@
 import './style.scss';
-import {Component, MouseEvent} from 'react';
+import {Component, MouseEvent, type JSX} from 'react';
 
 import ReactDiff, {DiffMethod} from '../../src/index';
 import logo from '../../logo.png';

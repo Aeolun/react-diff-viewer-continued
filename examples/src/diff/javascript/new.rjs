@@ -4,8 +4,8 @@ var HtmlWebpackPlugin = require('html-webpack-plugin');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var WriteFilePlugin = require('write-file-webpack-plugin');
 const additionalConfiguration = {
-	contentBase: path.resolve(__dirname, './app'),
-	reloadModules: true,
+    contentBase: path.resolve(__dirname, './app'),
+    reloadModules: true,
 }
 module.exports = {
   entry: [

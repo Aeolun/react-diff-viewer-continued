@@ -23,6 +23,173 @@ import { Fold } from "./fold.js";
 
 type IntrinsicElements = JSX.IntrinsicElements;
 
+/**
+ * Applies diff styling (ins/del tags) to pre-highlighted HTML by walking through
+ * the HTML and wrapping text portions based on character positions in the diff.
+ */
+function applyDiffToHighlightedHtml(
+  html: string,
+  diffArray: DiffInformation[],
+  styles: { wordDiff: string; wordAdded: string; wordRemoved: string },
+): string {
+  // Build diff ranges with character positions
+  interface DiffRange {
+    start: number;
+    end: number;
+    type: DiffType;
+  }
+
+  const ranges: DiffRange[] = [];
+  let pos = 0;
+  for (const diff of diffArray) {
+    const value = typeof diff.value === "string" ? diff.value : "";
+    if (value.length > 0) {
+      ranges.push({ start: pos, end: pos + value.length, type: diff.type });
+      pos += value.length;
+    }
+  }
+
+  // Parse HTML into tag and text segments
+  interface Segment {
+    type: "tag" | "text";
+    content: string;
+  }
+
+  const segments: Segment[] = [];
+  let i = 0;
+  while (i < html.length) {
+    if (html[i] === "<") {
+      const tagEnd = html.indexOf(">", i);
+      if (tagEnd === -1) {
+        // Malformed HTML, treat rest as text
+        segments.push({ type: "text", content: html.slice(i) });
+        break;
+      }
+      segments.push({ type: "tag", content: html.slice(i, tagEnd + 1) });
+      i = tagEnd + 1;
+    } else {
+      // Find the next tag or end of string
+      let textEnd = html.indexOf("<", i);
+      if (textEnd === -1) textEnd = html.length;
+      segments.push({ type: "text", content: html.slice(i, textEnd) });
+      i = textEnd;
+    }
+  }
+
+  // Helper to decode HTML entities for character counting
+  function decodeEntities(text: string): string {
+    return text
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, "\u00A0");
+  }
+
+  // Helper to get the wrapper tag for a diff type
+  function getWrapper(
+    type: DiffType,
+  ): { open: string; close: string } | null {
+    if (type === DiffType.ADDED) {
+      return {
+        open: `<ins class="${styles.wordDiff} ${styles.wordAdded}">`,
+        close: "</ins>",
+      };
+    }
+    if (type === DiffType.REMOVED) {
+      return {
+        open: `<del class="${styles.wordDiff} ${styles.wordRemoved}">`,
+        close: "</del>",
+      };
+    }
+    return {
+      open: `<span class="${styles.wordDiff}">`,
+      close: "</span>",
+    };
+  }
+
+  // Process segments, tracking text position
+  let textPos = 0;
+  let result = "";
+
+  for (const segment of segments) {
+    if (segment.type === "tag") {
+      result += segment.content;
+    } else {
+      // Text segment - we need to split it according to diff ranges
+      const text = segment.content;
+      const decodedText = decodeEntities(text);
+
+      // Walk through the text, character by character (in decoded form)
+      // but output the original encoded form
+      let localDecodedPos = 0;
+      let localEncodedPos = 0;
+
+      while (localDecodedPos < decodedText.length) {
+        const globalPos = textPos + localDecodedPos;
+
+        // Find the range that covers this position
+        const range = ranges.find(
+          (r) => globalPos >= r.start && globalPos < r.end,
+        );
+
+        if (!range) {
+          // No range covers this position (shouldn't happen, but be safe)
+          // Just output the character
+          const char = text[localEncodedPos];
+          result += char;
+          localEncodedPos++;
+          localDecodedPos++;
+          continue;
+        }
+
+        // How many decoded characters until the end of this range?
+        const charsUntilRangeEnd = range.end - globalPos;
+        // How many decoded characters until the end of this text segment?
+        const charsUntilTextEnd = decodedText.length - localDecodedPos;
+        // Take the minimum
+        const charsToTake = Math.min(charsUntilRangeEnd, charsUntilTextEnd);
+
+        // Now we need to find the corresponding encoded substring
+        // Walk through encoded text, counting decoded characters
+        let encodedChunkEnd = localEncodedPos;
+        let decodedCount = 0;
+        while (decodedCount < charsToTake && encodedChunkEnd < text.length) {
+          if (text[encodedChunkEnd] === "&") {
+            // Find entity end
+            const entityEnd = text.indexOf(";", encodedChunkEnd);
+            if (entityEnd !== -1 && entityEnd - encodedChunkEnd < 10) {
+              encodedChunkEnd = entityEnd + 1;
+            } else {
+              encodedChunkEnd++;
+            }
+          } else {
+            encodedChunkEnd++;
+          }
+          decodedCount++;
+        }
+
+        const chunk = text.slice(localEncodedPos, encodedChunkEnd);
+        const wrapper = getWrapper(range.type);
+
+        if (wrapper) {
+          result += wrapper.open + chunk + wrapper.close;
+        } else {
+          result += chunk;
+        }
+
+        localEncodedPos = encodedChunkEnd;
+        localDecodedPos += charsToTake;
+      }
+
+      textPos += decodedText.length;
+    }
+  }
+
+  return result;
+}
+
 export enum LineNumberPrefix {
   LEFT = "L",
   RIGHT = "R",
@@ -279,23 +446,70 @@ class DiffViewer extends React.Component<
    */
   private renderWordDiff = (
     diffArray: DiffInformation[],
-    _renderer?: (chunk: string) => JSX.Element,
+    renderer?: (chunk: string) => JSX.Element,
   ): ReactElement[] => {
     const showHighlight = this.shouldHighlightWordDiff();
+    const { compareMethod } = this.props;
+    // Don't apply syntax highlighting for JSON/YAML - their word diffs are computed
+    // on-demand from raw strings and syntax highlighting creates messy fragmented tokens.
+    const skipSyntaxHighlighting =
+      compareMethod === DiffMethod.JSON || compareMethod === DiffMethod.YAML;
 
+    // Reconstruct the full line from diff chunks
+    const fullLine = diffArray
+      .map((d) => (typeof d.value === "string" ? d.value : ""))
+      .join("");
+
+    // For very long lines (>500 chars), skip fancy processing - just render plain text
+    // without word-level highlighting to avoid performance issues
+    const MAX_LINE_LENGTH = 500;
+    if (fullLine.length > MAX_LINE_LENGTH) {
+      return [<span key="long-line">{fullLine}</span>];
+    }
+
+    // If we have a renderer and syntax highlighting is enabled, try to highlight
+    // the full line first, then apply diff styling to preserve proper tokenization.
+    if (renderer && !skipSyntaxHighlighting) {
+      // Get the syntax-highlighted content
+      const highlighted = renderer(fullLine);
+
+      // Check if the renderer uses dangerouslySetInnerHTML (common with Prism, highlight.js, etc.)
+      const htmlContent = highlighted?.props?.dangerouslySetInnerHTML?.__html;
+      if (typeof htmlContent === "string") {
+        // Apply diff styling to the highlighted HTML
+        const styledHtml = applyDiffToHighlightedHtml(htmlContent, diffArray, {
+          wordDiff: this.styles.wordDiff,
+          wordAdded: showHighlight ? this.styles.wordAdded : "",
+          wordRemoved: showHighlight ? this.styles.wordRemoved : "",
+        });
+
+        // Clone the element with the modified HTML
+        return [
+          React.cloneElement(highlighted, {
+            key: "highlighted-diff",
+            dangerouslySetInnerHTML: { __html: styledHtml },
+          }),
+        ];
+      }
+
+      // Renderer doesn't use dangerouslySetInnerHTML - fall through to per-chunk rendering
+    }
+
+    // Fallback: render each chunk separately (used for JSON/YAML or non-HTML renderers)
     return diffArray.map((wordDiff, i): JSX.Element => {
-      // Don't apply syntax highlighting to word diff chunks - it creates
-      // fragmented/nested tokens that look messy. Just use plain text.
-      const content = typeof wordDiff.value === 'string'
-        ? wordDiff.value
-        // If wordDiff.value is DiffInformation, we don't handle it, unclear why. See c0c99f5712.
-        : undefined;
+      let content: string | JSX.Element;
+      if (typeof wordDiff.value === "string") {
+        content = wordDiff.value;
+      } else {
+        // If wordDiff.value is DiffInformation[], we don't handle it. See c0c99f5712.
+        content = undefined;
+      }
 
       return wordDiff.type === DiffType.ADDED ? (
         <ins
           key={i}
           className={cn(this.styles.wordDiff, {
-            [this.styles.wordAdded]: showHighlight && wordDiff.type === DiffType.ADDED,
+            [this.styles.wordAdded]: showHighlight,
           })}
         >
           {content}
@@ -304,7 +518,7 @@ class DiffViewer extends React.Component<
         <del
           key={i}
           className={cn(this.styles.wordDiff, {
-            [this.styles.wordRemoved]: showHighlight && wordDiff.type === DiffType.REMOVED,
+            [this.styles.wordRemoved]: showHighlight,
           })}
         >
           {content}
@@ -618,12 +832,21 @@ class DiffViewer extends React.Component<
       </td>
     );
     const isUnifiedViewWithoutLineNumbers = !splitView && !hideLineNumbers;
+    const expandGutter = (
+      <td className={this.styles.codeFoldGutter}>
+        <Expand />
+      </td>
+    );
+
     return (
       <tr
         key={`${leftBlockLineNumber}-${rightBlockLineNumber}`}
         className={this.styles.codeFold}
+        onClick={this.onBlockClickProxy(blockNumber)}
+        role="button"
+        tabIndex={0}
       >
-        {!hideLineNumbers && <td className={this.styles.codeFoldGutter} />}
+        {!hideLineNumbers && expandGutter}
         {this.props.renderGutter ? (
           <td className={this.styles.codeFoldGutter} />
         ) : null}

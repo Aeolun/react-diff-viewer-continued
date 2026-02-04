@@ -323,13 +323,11 @@ export default (
 
   const wordAdded = css({
     background: variables.wordAddedBackground,
-    borderRadius: 4,
     label: "word-added",
   });
 
   const wordRemoved = css({
     background: variables.wordRemovedBackground,
-    borderRadius: 4,
     label: "word-removed",
   });
 
@@ -338,6 +336,8 @@ export default (
     label: "code-fold-gutter",
     minWidth: "50px",
     width: "50px",
+    textAlign: "center",
+    fill: variables.codeFoldContentColor,
   });
 
   const codeFoldContentContainer = css({
@@ -350,6 +350,7 @@ export default (
     display: "inline",
     margin: 0,
     border: "none",
+    fill: variables.codeFoldContentColor,
     label: "code-fold-expand-button",
   });
 
@@ -383,7 +384,16 @@ export default (
     alignItems: "center",
     userSelect: "none",
     fontWeight: 700,
+    cursor: "pointer",
     label: "code-fold",
+    "&:hover": {
+      color: variables.diffViewerColor,
+      fill: variables.diffViewerColor,
+      "& *": {
+        color: variables.diffViewerColor,
+        fill: variables.diffViewerColor,
+      },
+    },
     a: {
       textDecoration: "underline !important",
       cursor: "pointer",
