@@ -1,4 +1,4 @@
-<img src='https://github.com/Aeolun/react-diff-viewer-continued/raw/master/logo_dark.png' width="100%" alt='React Diff Viewer' />
+<img src='https://github.com/Aeolun/react-diff-viewer-continued/raw/main/logo_dark.png' width="100%" alt='React Diff Viewer' />
 
 <br/>
 
@@ -8,7 +8,7 @@
 
 [![npm version](https://img.shields.io/npm/v/react-diff-viewer-continued)](https://www.npmjs.com/package/react-diff-viewer-continued)
 [![npm downloads](https://img.shields.io/npm/dw/react-diff-viewer-continued)](https://www.npmjs.com/package/react-diff-viewer-continued)
-[![GitHub license](https://img.shields.io/github/license/aeolun/react-diff-viewer-continued.svg)](https://github.com/aeolun/react-diff-viewer-continued/blob/master/LICENSE)
+[![GitHub license](https://img.shields.io/github/license/aeolun/react-diff-viewer-continued.svg)](https://github.com/aeolun/react-diff-viewer-continued/blob/main/LICENSE)
 
 A simple and beautiful text diff viewer component made with [Diff](https://github.com/kpdecker/jsdiff) and [React](https://reactjs.org).
 
