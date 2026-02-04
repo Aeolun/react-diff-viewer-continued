@@ -11,6 +11,7 @@ import {
   DiffType,
   type LineInformation,
   computeLineInformationWorker,
+  computeDiff,
 } from "./compute-lines.js";
 import { Expand } from "./expand.js";
 import computeStyles, {
@@ -108,6 +109,10 @@ export interface ReactDiffViewerProps {
    * to display loading element when diff is being computed
    */
   loadingElement?: () => ReactElement
+  /**
+   * Hide the summary bar (expand/collapse button, change count, filename)
+   */
+  hideSummary?: boolean
 }
 
 export interface ReactDiffViewerState {
@@ -115,9 +120,10 @@ export interface ReactDiffViewerState {
   expandedBlocks?: number[];
   noSelect?: "left" | "right";
   scrollableContainerRef: RefObject<HTMLDivElement>
-  pageNumber: number
   computedDiffResult: Record<string, ComputedDiffResult>
   isLoading: boolean
+  // For virtualization: the first visible row index
+  visibleStartRow: number
 }
 
 class DiffViewer extends React.Component<
@@ -125,6 +131,9 @@ class DiffViewer extends React.Component<
   ReactDiffViewerState
 > {
   private styles: ReactDiffViewerStyles;
+
+  // Cache for on-demand word diff computation
+  private wordDiffCache: Map<string, { left: DiffInformation[]; right: DiffInformation[] }> = new Map();
 
   public static defaultProps: ReactDiffViewerProps = {
     oldValue: "",
@@ -149,11 +158,50 @@ class DiffViewer extends React.Component<
       expandedBlocks: [],
       noSelect: undefined,
       scrollableContainerRef: React.createRef(),
-      pageNumber: 1,
       computedDiffResult: {},
-      isLoading: false
+      isLoading: false,
+      visibleStartRow: 0
     };
   }
+
+  /**
+   * Computes word diff on-demand for a line, with caching.
+   * This is used when word diff was deferred during initial computation.
+   */
+  private getWordDiffValues = (
+    left: DiffInformation,
+    right: DiffInformation,
+    lineIndex: number
+  ): { leftValue: string | DiffInformation[]; rightValue: string | DiffInformation[] } => {
+    // Handle empty left/right
+    if (!left || !right) {
+      return { leftValue: left?.value, rightValue: right?.value };
+    }
+
+    // If no raw values, word diff was already computed or disabled
+    // Use explicit undefined check since empty string is a valid raw value
+    if (left.rawValue === undefined || right.rawValue === undefined) {
+      return { leftValue: left.value, rightValue: right.value };
+    }
+
+    // Check cache
+    const cacheKey = `${lineIndex}-${left.rawValue}-${right.rawValue}`;
+    let cached = this.wordDiffCache.get(cacheKey);
+
+    if (!cached) {
+      // Compute word diff on-demand
+      // Use CHARS method for on-demand computation since rawValue is always a string
+      // (JSON/YAML methods only work with objects, not the string lines we have here)
+      const compareMethod = (this.props.compareMethod === DiffMethod.JSON || this.props.compareMethod === DiffMethod.YAML)
+        ? DiffMethod.CHARS
+        : this.props.compareMethod;
+      const computed = computeDiff(left.rawValue, right.rawValue, compareMethod);
+      cached = { left: computed.left, right: computed.right };
+      this.wordDiffCache.set(cacheKey, cached);
+    }
+
+    return { leftValue: cached.left, rightValue: cached.right };
+  };
 
   /**
    * Resets code block expand to the initial stage. Will be exposed to the parent component via
@@ -208,6 +256,22 @@ class DiffViewer extends React.Component<
   };
 
   /**
+   * Checks if the current compare method should show word-level highlighting.
+   * Character, word-level, JSON, and YAML diffs benefit from highlighting individual changes.
+   * JSON/YAML use CHARS internally for word-level diff, so they should be highlighted.
+   */
+  private shouldHighlightWordDiff = (): boolean => {
+    const { compareMethod } = this.props;
+    return (
+      compareMethod === DiffMethod.CHARS ||
+      compareMethod === DiffMethod.WORDS ||
+      compareMethod === DiffMethod.WORDS_WITH_SPACE ||
+      compareMethod === DiffMethod.JSON ||
+      compareMethod === DiffMethod.YAML
+    );
+  };
+
+  /**
    * Maps over the word diff and constructs the required React elements to show word diff.
    *
    * @param diffArray Word diff information derived from line information.
@@ -215,21 +279,23 @@ class DiffViewer extends React.Component<
    */
   private renderWordDiff = (
     diffArray: DiffInformation[],
-    renderer?: (chunk: string) => JSX.Element,
+    _renderer?: (chunk: string) => JSX.Element,
   ): ReactElement[] => {
+    const showHighlight = this.shouldHighlightWordDiff();
+
     return diffArray.map((wordDiff, i): JSX.Element => {
-      const content = renderer
-        ? renderer(wordDiff.value as string)
-        : (typeof wordDiff.value === 'string'
-          ? wordDiff.value
-          // If wordDiff.value is DiffInformation, we don't handle it, unclear why. See c0c99f5712.
-          : undefined);
+      // Don't apply syntax highlighting to word diff chunks - it creates
+      // fragmented/nested tokens that look messy. Just use plain text.
+      const content = typeof wordDiff.value === 'string'
+        ? wordDiff.value
+        // If wordDiff.value is DiffInformation, we don't handle it, unclear why. See c0c99f5712.
+        : undefined;
 
       return wordDiff.type === DiffType.ADDED ? (
         <ins
           key={i}
           className={cn(this.styles.wordDiff, {
-            [this.styles.wordAdded]: wordDiff.type === DiffType.ADDED,
+            [this.styles.wordAdded]: showHighlight && wordDiff.type === DiffType.ADDED,
           })}
         >
           {content}
@@ -238,7 +304,7 @@ class DiffViewer extends React.Component<
         <del
           key={i}
           className={cn(this.styles.wordDiff, {
-            [this.styles.wordRemoved]: wordDiff.type === DiffType.REMOVED,
+            [this.styles.wordRemoved]: showHighlight && wordDiff.type === DiffType.REMOVED,
           })}
         >
           {content}
@@ -404,19 +470,22 @@ class DiffViewer extends React.Component<
     { left, right }: LineInformation,
     index: number,
   ): ReactElement => {
+    // Compute word diff on-demand if deferred
+    const { leftValue, rightValue } = this.getWordDiffValues(left, right, index);
+
     return (
       <tr key={index} className={this.styles.line}>
         {this.renderLine(
           left.lineNumber,
           left.type,
           LineNumberPrefix.LEFT,
-          left.value,
+          leftValue,
         )}
         {this.renderLine(
           right.lineNumber,
           right.type,
           LineNumberPrefix.RIGHT,
-          right.value,
+          rightValue,
         )}
       </tr>
     );
@@ -434,6 +503,9 @@ class DiffViewer extends React.Component<
     { left, right }: LineInformation,
     index: number,
   ): ReactElement => {
+    // Compute word diff on-demand if deferred
+    const { leftValue, rightValue } = this.getWordDiffValues(left, right, index);
+
     let content;
     if (left.type === DiffType.REMOVED && right.type === DiffType.ADDED) {
       return (
@@ -443,7 +515,7 @@ class DiffViewer extends React.Component<
               left.lineNumber,
               left.type,
               LineNumberPrefix.LEFT,
-              left.value,
+              leftValue,
               null,
             )}
           </tr>
@@ -452,7 +524,7 @@ class DiffViewer extends React.Component<
               null,
               right.type,
               LineNumberPrefix.RIGHT,
-              right.value,
+              rightValue,
               right.lineNumber,
               LineNumberPrefix.RIGHT,
             )}
@@ -465,7 +537,7 @@ class DiffViewer extends React.Component<
         left.lineNumber,
         left.type,
         LineNumberPrefix.LEFT,
-        left.value,
+        leftValue,
         null,
       );
     }
@@ -474,7 +546,7 @@ class DiffViewer extends React.Component<
         left.lineNumber,
         left.type,
         LineNumberPrefix.LEFT,
-        left.value,
+        leftValue,
         right.lineNumber,
         LineNumberPrefix.RIGHT,
       );
@@ -484,7 +556,7 @@ class DiffViewer extends React.Component<
         null,
         right.type,
         LineNumberPrefix.RIGHT,
-        right.value,
+        rightValue,
         right.lineNumber,
       );
     }
@@ -530,7 +602,7 @@ class DiffViewer extends React.Component<
       )
     ) : (
       <span className={this.styles.codeFoldContent}>
-        Expand {num} lines ...
+        @@ -{leftBlockLineNumber - num},{num} +{rightBlockLineNumber - num},{num} @@
       </span>
     );
     const content = (
@@ -636,6 +708,19 @@ class DiffViewer extends React.Component<
       return;
     }
 
+    // Defer word diff computation when using infinite loading with reasonable container height
+    // This significantly improves initial render time for large diffs
+    const containerHeight = this.props.infiniteLoading?.containerHeight;
+    const containerHeightPx = containerHeight
+      ? typeof containerHeight === 'number'
+        ? containerHeight
+        : parseInt(containerHeight, 10) || 0
+      : 0;
+    const shouldDeferWordDiff = !disableWordDiff &&
+      !!this.props.infiniteLoading &&
+      containerHeightPx > 0 &&
+      containerHeightPx < 2000;
+
     const { lineInformation, diffLines } = await computeLineInformationWorker(
       oldValue,
       newValue,
@@ -643,6 +728,7 @@ class DiffViewer extends React.Component<
       compareMethod,
       linesOffset,
       this.props.alwaysShowLines,
+      shouldDeferWordDiff,
     );
 
     const extraLines =
@@ -661,82 +747,160 @@ class DiffViewer extends React.Component<
       ...prev,
       computedDiffResult: this.state.computedDiffResult,
       isLoading: false,
-      pageNumber: 1
     }))
   }
 
+  // Estimated row height based on lineHeight: 1.6em with 12px base font
+  private static readonly ESTIMATED_ROW_HEIGHT = 19;
+
   /**
    * Handles scroll events on the scrollable container.
-   * 
-   * When the user scrolls past 80% of the total scroll height,
-   * it increments the `pageNumber` in the component's state.
-   * This is used to implement infinite scroll.
+   *
+   * Updates the visible start row for virtualization.
    */
   private onScroll = () => {
     const container = this.state.scrollableContainerRef.current
-    if (container && container.scrollTop + container.clientHeight >= (0.8 * container.scrollHeight)) {
-      this.setState((prev) => ({ ...prev, pageNumber: prev.pageNumber + 1 }));
+    if (!container || !this.props.infiniteLoading) return;
+
+    const newStartRow = Math.floor(container.scrollTop / DiffViewer.ESTIMATED_ROW_HEIGHT);
+
+    // Only update state if the start row changed (avoid unnecessary re-renders)
+    if (newStartRow !== this.state.visibleStartRow) {
+      this.setState({ visibleStartRow: newStartRow });
     }
   }
 
   /**
-   * Generates the entire diff view.
+   * Generates the entire diff view with virtualization support.
    */
   private renderDiff = (): {
     diffNodes: ReactElement[];
     lineInformation: LineInformation[];
     blocks: Block[];
+    totalRenderedRows: number;
+    topPadding: number;
   } => {
-    const { splitView, infiniteLoading } = this.props;
-    const { computedDiffResult, pageNumber } = this.state
+    const { splitView, infiniteLoading, showDiffOnly } = this.props;
+    const { computedDiffResult, expandedBlocks, visibleStartRow, scrollableContainerRef } = this.state
     const cacheKey = this.getMemoisedKey()
     const { lineInformation = [], lineBlocks = [], blocks = [] } = computedDiffResult[cacheKey] ?? {}
-    let finalLineInformation = [...lineInformation]
 
-    if (infiniteLoading) {
-      finalLineInformation = lineInformation.slice(
-        0,
-        Math.min(infiniteLoading.pageSize * pageNumber, lineInformation.length)
-      )
+    // Calculate visible range for virtualization
+    let visibleRowStart = 0;
+    let visibleRowEnd = Infinity;
+    const buffer = 5; // render extra rows above/below viewport
+
+    if (infiniteLoading && scrollableContainerRef.current) {
+      const container = scrollableContainerRef.current;
+      const viewportRows = Math.ceil(container.clientHeight / DiffViewer.ESTIMATED_ROW_HEIGHT);
+      visibleRowStart = Math.max(0, visibleStartRow - buffer);
+      visibleRowEnd = visibleStartRow + viewportRows + buffer;
     }
 
-    const diffNodes = finalLineInformation.map(
-      (line: LineInformation, lineIndex: number) => {
-        if (this.props.showDiffOnly) {
-          const blockIndex = lineBlocks[lineIndex];
+    // First pass: build a map of lineIndex -> renderedRowIndex
+    // This accounts for code folding where some lines don't render or render as fold indicators
+    const lineToRowMap: Map<number, number> = new Map();
+    const seenBlocks = new Set<number>();
+    let currentRow = 0;
 
-          if (blockIndex !== undefined) {
-            const lastLineOfBlock = blocks[blockIndex].endLine === lineIndex;
-            if (
-              !this.state.expandedBlocks.includes(blockIndex) &&
-              lastLineOfBlock
-            ) {
-              return (
-                <React.Fragment key={lineIndex}>
-                  {this.renderSkippedLineIndicator(
-                    blocks[blockIndex].lines,
-                    blockIndex,
-                    line.left.lineNumber,
-                    line.right.lineNumber,
-                  )}
-                </React.Fragment>
-              );
-            }
-            if (!this.state.expandedBlocks.includes(blockIndex)) {
-              return null;
-            }
+    for (let i = 0; i < lineInformation.length; i++) {
+      const blockIndex = lineBlocks[i];
+
+      if (showDiffOnly && blockIndex !== undefined) {
+        if (!expandedBlocks.includes(blockIndex)) {
+          // Line is in a collapsed block
+          const lastLineOfBlock = blocks[blockIndex].endLine === i;
+          if (!seenBlocks.has(blockIndex) && lastLineOfBlock) {
+            // This line renders as a fold indicator
+            seenBlocks.add(blockIndex);
+            lineToRowMap.set(i, currentRow);
+            currentRow++;
+          }
+          // Other lines in collapsed block don't render
+        } else {
+          // Block is expanded, line renders normally
+          lineToRowMap.set(i, currentRow);
+          currentRow++;
+        }
+      } else {
+        // Not in a block or showDiffOnly is false, line renders normally
+        lineToRowMap.set(i, currentRow);
+        currentRow++;
+      }
+    }
+
+    const totalRenderedRows = currentRow;
+
+    // Second pass: render only lines in the visible range
+    const diffNodes: ReactElement[] = [];
+    let topPadding = 0;
+    let firstVisibleFound = false;
+    seenBlocks.clear();
+
+    for (let lineIndex = 0; lineIndex < lineInformation.length; lineIndex++) {
+      const line = lineInformation[lineIndex];
+      const rowIndex = lineToRowMap.get(lineIndex);
+
+      // Skip lines that don't render (hidden in collapsed blocks)
+      if (rowIndex === undefined) continue;
+
+      // Skip lines before visible range
+      if (rowIndex < visibleRowStart) {
+        continue;
+      }
+
+      // Stop after visible range
+      if (rowIndex > visibleRowEnd) {
+        break;
+      }
+
+      // Calculate top padding from the first visible row
+      if (!firstVisibleFound) {
+        topPadding = rowIndex * DiffViewer.ESTIMATED_ROW_HEIGHT;
+        firstVisibleFound = true;
+      }
+
+      // Render the line
+      if (showDiffOnly) {
+        const blockIndex = lineBlocks[lineIndex];
+
+        if (blockIndex !== undefined) {
+          const lastLineOfBlock = blocks[blockIndex].endLine === lineIndex;
+          if (
+            !expandedBlocks.includes(blockIndex) &&
+            lastLineOfBlock
+          ) {
+            diffNodes.push(
+              <React.Fragment key={lineIndex}>
+                {this.renderSkippedLineIndicator(
+                  blocks[blockIndex].lines,
+                  blockIndex,
+                  line.left.lineNumber,
+                  line.right.lineNumber,
+                )}
+              </React.Fragment>
+            );
+            continue;
+          }
+          if (!expandedBlocks.includes(blockIndex)) {
+            continue;
           }
         }
+      }
 
-        return splitView
+      diffNodes.push(
+        splitView
           ? this.renderSplitView(line, lineIndex)
-          : this.renderInlineView(line, lineIndex);
-      },
-    );
+          : this.renderInlineView(line, lineIndex)
+      );
+    }
+
     return {
       diffNodes,
       blocks,
       lineInformation,
+      totalRenderedRows,
+      topPadding,
     };
   };
 
@@ -748,10 +912,12 @@ class DiffViewer extends React.Component<
       prevProps.disableWordDiff !== this.props.disableWordDiff ||
       prevProps.linesOffset !== this.props.linesOffset
     ) {
+      // Clear word diff cache when diff changes
+      this.wordDiffCache.clear();
       this.setState((prev) => ({
         ...prev,
         isLoading: true,
-        pageNumber: 1
+        visibleStartRow: 0
       }))
       this.memoisedCompute();
     }
@@ -760,8 +926,7 @@ class DiffViewer extends React.Component<
   componentDidMount() {
     this.setState((prev) => ({
       ...prev,
-      isLoading: true,
-      pageNumber: 1
+      isLoading: true
     }))
     this.memoisedCompute();
   }
@@ -846,9 +1011,51 @@ class DiffViewer extends React.Component<
 
     const LoadingElement = this.props.loadingElement;
     const scrollDivStyle = this.props.infiniteLoading ? {
-      overflow: 'scroll',
+      overflowY: 'scroll',
+      overflowX: 'hidden',
       height: this.props.infiniteLoading.containerHeight
-    } : {}
+    } as const : {}
+
+    const totalContentHeight = nodes.totalRenderedRows * DiffViewer.ESTIMATED_ROW_HEIGHT;
+
+    const tableElement = (
+      <table
+        className={cn(this.styles.diffContainer, {
+          [this.styles.splitView]: splitView,
+        })}
+        onMouseUp={() => {
+          const elements = document.getElementsByClassName("right");
+          for (let i = 0; i < elements.length; i++) {
+            const element = elements.item(i);
+            element.classList.remove(this.styles.noSelect);
+          }
+          const elementsLeft = document.getElementsByClassName("left");
+          for (let i = 0; i < elementsLeft.length; i++) {
+            const element = elementsLeft.item(i);
+            element.classList.remove(this.styles.noSelect);
+          }
+        }}
+      >
+        <colgroup>
+          {!this.props.hideLineNumbers && <col width={"50px"} />}
+          {!splitView && !this.props.hideLineNumbers && <col width={"50px"} />}
+          {this.props.renderGutter && <col width={"50px"} />}
+          <col width={"28px"} />
+          <col width={"auto"} />
+          {splitView && (
+            <>
+              {!this.props.hideLineNumbers && <col width={"50px"} />}
+              {this.props.renderGutter && <col width={"50px"} />}
+              <col width={"28px"} />
+              <col width={"auto"} />
+            </>
+          )}
+        </colgroup>
+        <tbody>
+          {nodes.diffNodes}
+        </tbody>
+      </table>
+    );
 
     return (
       <div
@@ -856,87 +1063,54 @@ class DiffViewer extends React.Component<
         onScroll={this.onScroll}
         ref={this.state.scrollableContainerRef}
       >
-        <div className={this.styles.summary} role={"banner"}>
-          <button
-            type={"button"}
-            className={this.styles.allExpandButton}
-            onClick={() => {
-              this.setState({
-                expandedBlocks: allExpanded
-                  ? []
-                  : nodes.blocks.map((b) => b.index),
-              });
-            }}
-          >
-            {allExpanded ? <Fold /> : <Expand />}
-          </button>{" "}
-          {totalChanges}
-          <div style={{ display: "flex", gap: "1px" }}>{blocks}</div>
-          {this.props.summary ? <span>{this.props.summary}</span> : null}
-        </div>
-        {this.state.isLoading && LoadingElement && <LoadingElement />}
-        <table
-          className={cn(this.styles.diffContainer, {
-            [this.styles.splitView]: splitView,
-          })}
-          onMouseUp={() => {
-            const elements = document.getElementsByClassName("right");
-            for (let i = 0; i < elements.length; i++) {
-              const element = elements.item(i);
-              element.classList.remove(this.styles.noSelect);
-            }
-            const elementsLeft = document.getElementsByClassName("left");
-            for (let i = 0; i < elementsLeft.length; i++) {
-              const element = elementsLeft.item(i);
-              element.classList.remove(this.styles.noSelect);
-            }
-          }}
-        >
-          <tbody>
-            <tr>
-              {!this.props.hideLineNumbers ? <td width={"50px"} /> : null}
-              {!splitView && !this.props.hideLineNumbers ? (
-                <td width={"50px"} />
-              ) : null}
-              {this.props.renderGutter ? <td width={"50px"} /> : null}
-              <td width={"28px"} />
-              <td width={"100%"} />
-              {splitView ? (
-                <>
-                  {!this.props.hideLineNumbers ? <td width={"50px"} /> : null}
-                  {this.props.renderGutter ? <td width={"50px"} /> : null}
-                  <td width={"28px"} />
-                  <td width={"100%"} />
-                </>
-              ) : null}
-            </tr>
-            {leftTitle || rightTitle ? (
-              <tr>
-                <th
-                  colSpan={splitView ? colSpanOnSplitView : colSpanOnInlineView}
-                  className={cn(this.styles.titleBlock, this.styles.column)}
+        {(!this.props.hideSummary || leftTitle || rightTitle) && (
+          <div className={this.styles.stickyHeader}>
+            {!this.props.hideSummary && (
+              <div className={this.styles.summary} role={"banner"}>
+                <button
+                  type={"button"}
+                  className={this.styles.allExpandButton}
+                  onClick={() => {
+                    this.setState({
+                      expandedBlocks: allExpanded
+                        ? []
+                        : nodes.blocks.map((b) => b.index),
+                    });
+                  }}
                 >
+                  {allExpanded ? <Fold /> : <Expand />}
+                </button>{" "}
+                {totalChanges}
+                <div style={{ display: "flex", gap: "1px" }}>{blocks}</div>
+                {this.props.summary ? <span>{this.props.summary}</span> : null}
+              </div>
+            )}
+            {(leftTitle || rightTitle) && (
+              <div className={this.styles.columnHeaders}>
+                <div className={this.styles.titleBlock}>
                   {leftTitle ? (
                     <pre className={this.styles.contentText}>{leftTitle}</pre>
                   ) : null}
-                </th>
-                {splitView ? (
-                  <th
-                    colSpan={colSpanOnSplitView}
-                    className={cn(this.styles.titleBlock, this.styles.column)}
-                  >
+                </div>
+                {splitView && (
+                  <div className={this.styles.titleBlock}>
                     {rightTitle ? (
-                      <pre className={this.styles.contentText}>
-                        {rightTitle}
-                      </pre>
+                      <pre className={this.styles.contentText}>{rightTitle}</pre>
                     ) : null}
-                  </th>
-                ) : null}
-              </tr>
-            ) : null}
-            {nodes.diffNodes}
-          </tbody>
-        </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {this.state.isLoading && LoadingElement && <LoadingElement />}
+        {this.props.infiniteLoading ? (
+          <div style={{ minHeight: totalContentHeight, paddingTop: nodes.topPadding }}>
+            {tableElement}
+          </div>
+        ) : (
+          tableElement
+        )}
       </div>
     );
   };

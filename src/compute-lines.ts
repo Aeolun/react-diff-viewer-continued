@@ -1,4 +1,5 @@
 import * as diff from "diff";
+import * as yaml from "js-yaml";
 
 const jsDiff: { [key: string]: any } = diff;
 
@@ -7,6 +8,265 @@ export enum DiffType {
   ADDED = 1,
   REMOVED = 2,
   CHANGED = 3,
+}
+
+type Formatter = 'json' | 'yaml';
+
+/**
+ * Stringify a value using the specified format.
+ */
+function stringify(val: unknown, format: Formatter): string {
+  if (format === 'yaml') {
+    return yaml.dump(val, { indent: 2, lineWidth: -1, noRefs: true }).trimEnd();
+  }
+  return JSON.stringify(val, null, 2);
+}
+
+/**
+ * Performs a fast structural diff on objects.
+ *
+ * Strategy: Use structural comparison to identify which subtrees changed,
+ * then use diffLines only on those changed subtrees. This avoids running
+ * the expensive O(ND) Myers diff on the entire content, while still producing
+ * proper line-by-line diffs for the parts that changed.
+ */
+function structuralDiff(
+  oldObj: unknown,
+  newObj: unknown,
+  format: Formatter = 'json'
+): diff.Change[] {
+  const oldStr = stringify(oldObj, format);
+  const newStr = stringify(newObj, format);
+
+  // Fast path: identical objects
+  if (oldStr === newStr) {
+    return [{ value: oldStr }];
+  }
+
+  // Use recursive structural diff that applies diffLines to changed subtrees
+  return diffStructurally(oldObj, newObj, 0, format);
+}
+
+// Backwards compatibility alias
+function structuralJsonDiff(oldObj: unknown, newObj: unknown): diff.Change[] {
+  return structuralDiff(oldObj, newObj, 'json');
+}
+
+/**
+ * Optimized diff for YAML that preserves original line numbers.
+ * Uses parsing only to check for structural equality (fast path),
+ * then falls back to diffLines on original strings to preserve line numbers.
+ */
+function structuralYamlDiff(oldYaml: string, newYaml: string): diff.Change[] {
+  // Parse YAML to check for structural equality
+  const oldObj = yaml.load(oldYaml);
+  const newObj = yaml.load(newYaml);
+
+  // Fast path: check if structurally identical by comparing serialized forms
+  const oldNormalized = yaml.dump(oldObj, { indent: 2, lineWidth: -1, noRefs: true });
+  const newNormalized = yaml.dump(newObj, { indent: 2, lineWidth: -1, noRefs: true });
+
+  if (oldNormalized === newNormalized) {
+    // Structurally identical - return original string to preserve formatting
+    return [{ value: oldYaml }];
+  }
+
+  // Files differ - use diffLines on ORIGINAL strings to preserve line numbers
+  return diff.diffLines(oldYaml, newYaml, {
+    newlineIsToken: false,
+    ignoreWhitespace: false,
+    ignoreCase: false,
+  });
+}
+
+/**
+ * Recursively diff two values structurally.
+ * For unchanged parts, output as-is.
+ * For changed parts, use diffLines to get proper line-by-line diff.
+ */
+function diffStructurally(
+  oldVal: unknown,
+  newVal: unknown,
+  indent: number,
+  format: Formatter = 'json'
+): diff.Change[] {
+  const oldStr = stringify(oldVal, format);
+  const newStr = stringify(newVal, format);
+
+  // Fast path: identical
+  if (oldStr === newStr) {
+    return [{ value: reindent(oldStr, indent, format) }];
+  }
+
+  // Both are objects - compare key by key
+  if (
+    typeof oldVal === 'object' && oldVal !== null &&
+    typeof newVal === 'object' && newVal !== null &&
+    !Array.isArray(oldVal) && !Array.isArray(newVal)
+  ) {
+    return diffObjects(
+      oldVal as Record<string, unknown>,
+      newVal as Record<string, unknown>,
+      indent,
+      format
+    );
+  }
+
+  // Both are arrays - compare element by element
+  if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+    return diffArrays(oldVal, newVal, indent, format);
+  }
+
+  // Different types or primitives - use diffLines for proper diff
+  return diffWithLines(oldStr, newStr, indent, format);
+}
+
+/**
+ * Diff two objects key by key.
+ */
+function diffObjects(
+  oldObj: Record<string, unknown>,
+  newObj: Record<string, unknown>,
+  indent: number,
+  format: Formatter = 'json'
+): diff.Change[] {
+  const changes: diff.Change[] = [];
+  const indentStr = '  '.repeat(indent);
+  const innerIndent = '  '.repeat(indent + 1);
+
+  const oldKeys = Object.keys(oldObj);
+  const newKeys = Object.keys(newObj);
+  const allKeys = [...new Set([...oldKeys, ...newKeys])];
+
+  changes.push({ value: indentStr + '{\n' });
+
+  for (let i = 0; i < allKeys.length; i++) {
+    const key = allKeys[i];
+    const isLast = i === allKeys.length - 1;
+    const comma = isLast ? '' : ',';
+    const inOld = key in oldObj;
+    const inNew = key in newObj;
+
+    if (inOld && inNew) {
+      // Key in both - recursively diff values
+      const oldValStr = stringify(oldObj[key], format);
+      const newValStr = stringify(newObj[key], format);
+
+      if (oldValStr === newValStr) {
+        // Values identical
+        const valueStr = reindent(oldValStr, indent + 1);
+        changes.push({ value: innerIndent + JSON.stringify(key) + ': ' + valueStr + comma + '\n' });
+      } else {
+        // Values differ - recursively diff them
+        changes.push({ value: innerIndent + JSON.stringify(key) + ': ' });
+        const valueDiff = diffStructurally(oldObj[key], newObj[key], indent + 1, format);
+
+        // Add comma to last change if needed
+        if (comma && valueDiff.length > 0) {
+          const last = valueDiff[valueDiff.length - 1];
+          last.value = last.value.replace(/\n$/, comma + '\n');
+        }
+        changes.push(...valueDiff);
+      }
+    } else if (inOld) {
+      // Key only in old - removed
+      const valueStr = reindent(stringify(oldObj[key], format), indent + 1);
+      changes.push({ removed: true, value: innerIndent + JSON.stringify(key) + ': ' + valueStr + comma + '\n' });
+    } else {
+      // Key only in new - added
+      const valueStr = reindent(stringify(newObj[key], format), indent + 1);
+      changes.push({ added: true, value: innerIndent + JSON.stringify(key) + ': ' + valueStr + comma + '\n' });
+    }
+  }
+
+  changes.push({ value: indentStr + '}' });
+  return changes;
+}
+
+/**
+ * Diff two arrays element by element.
+ */
+function diffArrays(
+  oldArr: unknown[],
+  newArr: unknown[],
+  indent: number,
+  format: Formatter = 'json'
+): diff.Change[] {
+  const changes: diff.Change[] = [];
+  const indentStr = '  '.repeat(indent);
+  const innerIndent = '  '.repeat(indent + 1);
+
+  changes.push({ value: indentStr + '[\n' });
+
+  const maxLen = Math.max(oldArr.length, newArr.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    const isLast = i === maxLen - 1;
+    const comma = isLast ? '' : ',';
+
+    if (i >= oldArr.length) {
+      // Element only in new - added
+      const valueStr = reindent(stringify(newArr[i], format), indent + 1);
+      changes.push({ added: true, value: innerIndent + valueStr + comma + '\n' });
+    } else if (i >= newArr.length) {
+      // Element only in old - removed
+      const valueStr = reindent(stringify(oldArr[i], format), indent + 1);
+      changes.push({ removed: true, value: innerIndent + valueStr + comma + '\n' });
+    } else {
+      // Element in both - recursively diff
+      const oldElemStr = stringify(oldArr[i], format);
+      const newElemStr = stringify(newArr[i], format);
+
+      if (oldElemStr === newElemStr) {
+        // Elements identical
+        const valueStr = reindent(oldElemStr, indent + 1);
+        changes.push({ value: innerIndent + valueStr + comma + '\n' });
+      } else {
+        // Elements differ - recursively diff them
+        changes.push({ value: innerIndent });
+        const elemDiff = diffStructurally(oldArr[i], newArr[i], indent + 1, format);
+
+        // Add comma to last change if needed
+        if (comma && elemDiff.length > 0) {
+          const last = elemDiff[elemDiff.length - 1];
+          last.value = last.value.replace(/\n$/, comma + '\n');
+        }
+        changes.push(...elemDiff);
+      }
+    }
+  }
+
+  changes.push({ value: indentStr + ']' });
+  return changes;
+}
+
+/**
+ * Use diffLines for proper line-by-line diff of two strings.
+ * This is the fallback for when structural comparison finds different values.
+ */
+function diffWithLines(oldStr: string, newStr: string, indent: number, _format: Formatter = 'json'): diff.Change[] {
+  const oldIndented = reindent(oldStr, indent);
+  const newIndented = reindent(newStr, indent);
+
+  // Use diffLines for proper line-level comparison
+  const lineDiff = diff.diffLines(oldIndented, newIndented);
+
+  return lineDiff.map(change => ({
+    value: change.value,
+    added: change.added,
+    removed: change.removed
+  }));
+}
+
+/**
+ * Re-indent a string to the specified level.
+ */
+function reindent(str: string, indent: number, _format: Formatter = 'json'): string {
+  if (indent === 0) return str;
+  const indentStr = '  '.repeat(indent);
+  return str.split('\n').map((line, i) =>
+    i === 0 ? line : indentStr + line
+  ).join('\n');
 }
 
 // See https://github.com/kpdecker/jsdiff/tree/v4.0.1#api for more info on the below JsDiff methods
@@ -19,12 +279,15 @@ export enum DiffMethod {
   SENTENCES = "diffSentences",
   CSS = "diffCss",
   JSON = "diffJson",
+  YAML = "diffYaml",
 }
 
 export interface DiffInformation {
   value?: string | DiffInformation[];
   lineNumber?: number;
   type?: DiffType;
+  // For deferred word diff computation - stores raw strings
+  rawValue?: string;
 }
 
 export interface LineInformation {
@@ -133,18 +396,36 @@ const computeLineInformation = (
     | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
   linesOffset = 0,
   showLines: string[] = [],
+  deferWordDiff = false,
 ): ComputedLineInformation => {
   let diffArray: Diff.Change[] = [];
 
-  // Use diffLines for strings, and diffJson for objects...
+  // Handle different input types and compare methods
   if (typeof oldString === "string" && typeof newString === "string") {
-    diffArray = diff.diffLines(oldString, newString, {
-      newlineIsToken: false,
-      ignoreWhitespace: false,
-      ignoreCase: false,
-    });
+    // Check if we should parse as YAML for structural diff
+    if (lineCompareMethod === DiffMethod.YAML) {
+      try {
+        // Use YAML structural diff - parses, normalizes, and outputs as YAML
+        diffArray = structuralYamlDiff(oldString, newString);
+      } catch (e) {
+        // If YAML parsing fails, fall back to line diff
+        diffArray = diff.diffLines(oldString, newString, {
+          newlineIsToken: false,
+          ignoreWhitespace: false,
+          ignoreCase: false,
+        });
+      }
+    } else {
+      diffArray = diff.diffLines(oldString, newString, {
+        newlineIsToken: false,
+        ignoreWhitespace: false,
+        ignoreCase: false,
+      });
+    }
   } else {
-    diffArray = diff.diffJson(oldString, newString);
+    // Use our fast structural JSON diff instead of diff.diffJson
+    // This is O(n) for structure comparison vs O(ND) for Myers on large strings
+    diffArray = structuralJsonDiff(oldString, newString);
   }
 
   let rightLineNumber = linesOffset;
@@ -218,6 +499,12 @@ const computeLineInformation = (
                   // Do char level diff and assign the corresponding values to the
                   // left and right diff information object.
                   if (disableWordDiff) {
+                    right.value = rightValue;
+                  } else if (deferWordDiff) {
+                    // Store raw values for deferred word diff computation
+                    left.rawValue = line;
+                    left.value = line;
+                    right.rawValue = rightValue as string;
                     right.value = rightValue;
                   } else {
                     const computedDiff = computeDiff(
@@ -303,8 +590,16 @@ const computeLineInformationWorker = (
     | DiffMethod
     | ((oldStr: string, newStr: string) => diff.Change[]) = DiffMethod.CHARS,
   linesOffset = 0,
-  showLines: string[] = []
+  showLines: string[] = [],
+  deferWordDiff = false
 ): Promise<ComputedLineInformation> => {
+  // Fall back to synchronous computation if Worker is not available (e.g., in Node.js/test environments)
+  if (typeof Worker === 'undefined') {
+    return Promise.resolve(
+      computeLineInformation(oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff)
+    );
+  }
+
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./computeWorker.ts', import.meta.url), { type: 'module' });
 
@@ -318,9 +613,9 @@ const computeLineInformationWorker = (
       worker.terminate();
     };
 
-    worker.postMessage({ oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines });
+    worker.postMessage({ oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff });
   });
 };
 
 
-export { computeLineInformation, computeLineInformationWorker };
+export { computeLineInformation, computeLineInformationWorker, computeDiff };

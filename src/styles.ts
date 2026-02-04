@@ -24,6 +24,8 @@ export interface ReactDiffViewerStyles {
   emptyGutter?: string;
   emptyLine?: string;
   codeFold?: string;
+  stickyHeader?: string;
+  columnHeaders?: string;
   titleBlock?: string;
   content?: string;
   column?: string;
@@ -136,15 +138,15 @@ export default (
       ...{
         diffViewerBackground: "#2e303c",
         diffViewerColor: "#FFF",
-        addedBackground: "#044B53",
+        addedBackground: "#2ea04326",
         addedColor: "white",
-        removedBackground: "#632F34",
+        removedBackground: "#f851491a",
         removedColor: "white",
         changedBackground: "#3e302c",
-        wordAddedBackground: "#055d67",
-        wordRemovedBackground: "#7d383f",
-        addedGutterBackground: "#034148",
-        removedGutterBackground: "#632b30",
+        wordAddedBackground: "#2ea04366",
+        wordRemovedBackground: "#f8514966",
+        addedGutterBackground: "#3fb9504d",
+        removedGutterBackground: "#f851494d",
         gutterBackground: "#2c2f3a",
         gutterBackgroundDark: "#262933",
         highlightBackground: "#2a3967",
@@ -152,12 +154,12 @@ export default (
         codeFoldGutterBackground: "#262831",
         codeFoldBackground: "#262831",
         emptyLineBackground: "#363946",
-        gutterColor: "#666c87",
-        addedGutterColor: "#8c8c8c",
-        removedGutterColor: "#8c8c8c",
-        codeFoldContentColor: "#656a8b",
+        gutterColor: "#f0f6fc",
+        addedGutterColor: "#f0f6fc",
+        removedGutterColor: "#f0f6fc",
+        codeFoldContentColor: "#9198a1",
         diffViewerTitleBackground: "#2f323e",
-        diffViewerTitleColor: "#757a9b",
+        diffViewerTitleColor: "#f0f6fc",
         diffViewerTitleBorderColor: "#353846",
       },
       ...(overrideVariables.dark || {}),
@@ -177,6 +179,13 @@ export default (
     label: "split-view",
   });
 
+  const stickyHeader = css({
+    position: "sticky",
+    top: 0,
+    zIndex: 2,
+    label: "sticky-header",
+  });
+
   const summary = css({
     background: variables.diffViewerTitleBackground,
     color: variables.diffViewerTitleColor,
@@ -185,7 +194,13 @@ export default (
     alignItems: "center",
     gap: "0.5em",
     fontFamily: "monospace",
+    fontSize: 12,
     fill: variables.diffViewerTitleColor,
+  });
+
+  const columnHeaders = css({
+    display: "flex",
+    label: "column-headers",
   });
 
   const diffContainer = css({
@@ -193,6 +208,7 @@ export default (
     minWidth: "1000px",
     overflowX: "auto",
     tableLayout: "fixed",
+    fontSize: 12,
     background: variables.diffViewerBackground,
     pre: {
       margin: 0,
@@ -248,8 +264,13 @@ export default (
     overflow: "hidden",
     width: "50%",
     borderBottom: `1px solid ${variables.diffViewerTitleBorderColor}`,
+    boxSizing: "border-box",
+    fontSize: 12,
     label: "title-block",
-    ":last-child": {
+    ":only-child": {
+      width: "100%",
+    },
+    ":last-child:not(:only-child)": {
       borderLeft: `1px solid ${variables.diffViewerTitleBorderColor}`,
     },
     [`.${contentText}`]: {
@@ -295,22 +316,20 @@ export default (
   });
 
   const wordDiff = css({
-    padding: 2,
-    display: "inline-flex",
-    borderRadius: 4,
-    wordBreak: "break-all",
+    display: "inline",
+    textDecoration: "none",
     label: "word-diff",
   });
 
   const wordAdded = css({
     background: variables.wordAddedBackground,
-    textDecoration: "none",
+    borderRadius: 4,
     label: "word-added",
   });
 
   const wordRemoved = css({
     background: variables.wordRemovedBackground,
-    textDecoration: "none",
+    borderRadius: 4,
     label: "word-removed",
   });
 
@@ -360,8 +379,7 @@ export default (
 
   const codeFold = css({
     backgroundColor: variables.codeFoldBackground,
-    height: 40,
-    fontSize: 14,
+    fontSize: 12,
     alignItems: "center",
     userSelect: "none",
     fontWeight: 700,
@@ -417,7 +435,8 @@ export default (
     padding: "0 10px",
     whiteSpace: "nowrap",
     label: "gutter",
-    textAlign: "right",
+    textAlign: "center",
+    color: variables.gutterColor,
     background: variables.gutterBackground,
     "&:hover": {
       cursor: "pointer",
@@ -428,6 +447,8 @@ export default (
     },
     pre: {
       opacity: 0.5,
+      textAlign: "center",
+      width: "100%",
     },
     [`&.${diffAdded}`]: {
       background: variables.addedGutterBackground,
@@ -490,6 +511,8 @@ export default (
     content,
     column,
     codeFoldContent,
+    stickyHeader,
+    columnHeaders,
     titleBlock,
     allExpandButton,
   };

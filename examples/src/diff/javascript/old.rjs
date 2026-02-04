@@ -5,8 +5,8 @@ var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var WriteFilePlugin = require('write-file-webpack-plugin');
 const devServer = {
 	contentBase: path.resolve(__dirname, './app'),
-	outputPath: path.join(__dirname, './dist'),
-	colors: true,
+    outputPath: path.join(__dirname, './dist'),
+    colors: true,
 	quiet: false,
 	noInfo: false,
 	publicPath: '/',

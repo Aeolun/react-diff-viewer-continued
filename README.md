@@ -71,29 +71,85 @@ class Diff extends PureComponent {
 
 | Prop                      | Type                      | Default                        | Description                                                                                                                                                                                                                                                                                                                                                                                                      |
 |---------------------------|---------------------------|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| oldValue                  | `string                   \| Object`                        | `''`                                                                                                                                                                                                                                                                                                                                                                                                             | Old value as string (or Object if using `diffJson`).                                                                                                                                                                                                                                                                                                                                                                                             |
-| newValue                  | `string                   \| Object`                        | `''`                                                                                                                                                                                                                                                                                                                                                                                                             | New value as string (or Object if using `diffJson`).                                                                                                                                                                                                                                                                                                                                                                                             |
+| oldValue                  | `string \| Object`        | `''`                           | Old value as string (or Object if using `DiffMethod.JSON`).                                                                                                                                                                                                                                                                                                                                                      |
+| newValue                  | `string \| Object`        | `''`                           | New value as string (or Object if using `DiffMethod.JSON`).                                                                                                                                                                                                                                                                                                                                                      |
 | splitView                 | `boolean`                 | `true`                         | Switch between `unified` and `split` view.                                                                                                                                                                                                                                                                                                                                                                       |
 | disableWordDiff           | `boolean`                 | `false`                        | Show and hide word diff in a diff line.                                                                                                                                                                                                                                                                                                                                                                          |
-| compareMethod             | `DiffMethod \| (string, string) => diff.Change[]`              | `DiffMethod.CHARS`             | Uses an existing diff method when a `DiffMethod` enum is passed. If a function is passed, that function is used as the diff method. <br /> <br /> JsDiff text diff method used for diffing strings. Check out the [guide](https://github.com/praneshr/react-diff-viewer/tree/v3.0.0#text-block-diff-comparison) to use different methods.                                                                                                                                                                                                                           |
+| compareMethod             | `DiffMethod \| (string, string) => diff.Change[]` | `DiffMethod.CHARS` | JsDiff text diff method. See [Text block diff comparison](#text-block-diff-comparison). **Important:** For JSON files use `DiffMethod.JSON`, for YAML files use `DiffMethod.YAML` - these use optimized structural comparison that is significantly faster than generic text diff for large files.                                                                                                               |
 | renderGutter              | `(diffData) => ReactNode` | `undefined`                    | Function that can be used to render an extra gutter with various information next to the line number.                                                                                                                                                                                                                                                                                                            |
 | hideLineNumbers           | `boolean`                 | `false`                        | Show and hide line numbers.                                                                                                                                                                                                                                                                                                                                                                                      |
-| alwaysShowLines           | `string[]`                | `[]`                          | List of lines to always be shown, regardless of diff status. Line number are prefixed with `L` and `R` for the left and right section of the diff viewer, respectively. For example, `L-20` means 20th line in the left pane. `extraLinesSurroundingDiff` applies to these lines as well.                                                                                                                        |
-| renderContent             | `function`                | `undefined`                    | Render Prop API to render code in the diff viewer. Helpful for [syntax highlighting](#syntax-highlighting)                                                                                                                                                                                                                                                                                                       |
-| onLineNumberClick         | `function`                | `undefined`                    | Event handler for line number click. `(lineId: string) => void`                                                                                                                                                                                                                                                                                                                                                  |
-| highlightLines            | `string[]`                | `[]`                           | List of lines to be highlighted. Works together with `onLineNumberClick`. Line number are prefixed with `L` and `R` for the left and right section of the diff viewer, respectively. For example, `L-20` means 20th line in the left pane. To highlight a range of line numbers, pass the prefixed line number as an array. For example, `[L-2, L-3, L-4, L-5]` will highlight the lines `2-5` in the left pane. |
-| showDiffOnly              | `boolean`                 | `true`                         | Shows only the diffed lines and folds the unchanged lines                                                                                                                                                                                                                                                                                                                                                        |
+| alwaysShowLines           | `string[]`                | `[]`                           | List of lines to always be shown, regardless of diff status. Line numbers are prefixed with `L` and `R` for the left and right section of the diff viewer, respectively. For example, `L-20` means 20th line in the left pane. `extraLinesSurroundingDiff` applies to these lines as well.                                                                                                                       |
+| renderContent             | `function`                | `undefined`                    | Render Prop API to render code in the diff viewer. Helpful for [syntax highlighting](#syntax-highlighting).                                                                                                                                                                                                                                                                                                      |
+| onLineNumberClick         | `function`                | `undefined`                    | Event handler for line number click. `(lineId: string, event: MouseEvent) => void`                                                                                                                                                                                                                                                                                                                               |
+| highlightLines            | `string[]`                | `[]`                           | List of lines to be highlighted. Works together with `onLineNumberClick`. Line numbers are prefixed with `L` and `R` for the left and right section of the diff viewer, respectively. For example, `L-20` means 20th line in the left pane. To highlight a range of line numbers, pass the prefixed line number as an array. For example, `[L-2, L-3, L-4, L-5]` will highlight the lines `2-5` in the left pane. |
+| showDiffOnly              | `boolean`                 | `true`                         | Shows only the diffed lines and folds the unchanged lines.                                                                                                                                                                                                                                                                                                                                                       |
 | extraLinesSurroundingDiff | `number`                  | `3`                            | Number of extra unchanged lines surrounding the diff. Works along with `showDiffOnly`.                                                                                                                                                                                                                                                                                                                           |
-| codeFoldMessageRenderer   | `function`                | `Expand {number} of lines ...` | Render Prop API to render code fold message.                                                                                                                                                                                                                                                                                                                                                                     |
-| styles                    | `object`                  | `{}`                           | To override style variables and styles. Learn more about [overriding styles](#overriding-styles)                                                                                                                                                                                                                                                                                                                 |
-| useDarkTheme              | `boolean`                 | `true`                         | To enable/disable dark theme.                                                                                                                                                                                                                                                                                                                                                                                    |
-| leftTitle                 | `string`                  | `undefined`                    | Column title for left section of the diff in split view. This will be used as the only title in inline view.                                                                                                                                                                                                                                                                                                     |
-| rightTitle                | `string`                  | `undefined`                    | Column title for right section of the diff in split view. This will be ignored in inline view.                                                                                                                                                                                                                                                                                                                   |
+| codeFoldMessageRenderer   | `function`                | `undefined`                    | Render Prop API to render code fold message. `(totalFoldedLines: number, leftStartLineNumber: number, rightStartLineNumber: number) => ReactElement`                                                                                                                                                                                                                                                             |
+| styles                    | `object`                  | `{}`                           | To override style variables and styles. Learn more about [overriding styles](#overriding-styles).                                                                                                                                                                                                                                                                                                                |
+| useDarkTheme              | `boolean`                 | `false`                        | To enable/disable dark theme.                                                                                                                                                                                                                                                                                                                                                                                    |
+| leftTitle                 | `string \| ReactElement`  | `undefined`                    | Column title for left section of the diff in split view. This will be used as the only title in inline view.                                                                                                                                                                                                                                                                                                     |
+| rightTitle                | `string \| ReactElement`  | `undefined`                    | Column title for right section of the diff in split view. This will be ignored in inline view.                                                                                                                                                                                                                                                                                                                   |
 | linesOffset               | `number`                  | `0`                            | Number to start count code lines from.                                                                                                                                                                                                                                                                                                                                                                           |
+| summary                   | `string \| ReactElement`  | `undefined`                    | Text or element to display in the summary bar (e.g., filename).                                                                                                                                                                                                                                                                                                                                                  |
+| hideSummary               | `boolean`                 | `false`                        | Hide the summary bar (expand/collapse button, change count, summary text).                                                                                                                                                                                                                                                                                                                                       |
+| infiniteLoading           | `{ pageSize: number, containerHeight: string }` | `undefined`        | Enable virtualization for large diffs. When enabled, only visible rows are rendered. `containerHeight` sets the scrollable container height (e.g., `'500px'` or `'80vh'`).                                                                                                                                                                                                                                       |
+| loadingElement            | `() => ReactElement`      | `undefined`                    | Function that returns an element to display while the diff is being computed. Useful with `infiniteLoading` for large files.                                                                                                                                                                                                                                                                                     |
+| nonce                     | `string`                  | `''`                           | Nonce to use for inline styles (for CSP).                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Instance Methods
 
-`resetCodeBlocks()` - Resets the expanded code blocks to it's initial state. Return `true` on successful reset and `false` during unsuccessful reset.
+`resetCodeBlocks()` - Resets the expanded code blocks to its initial state. Returns `true` on successful reset and `false` during unsuccessful reset.
+
+## Large Diffs and Performance
+
+For large files (thousands of lines), the diff viewer provides several features to maintain good performance:
+
+### Virtualization with infiniteLoading
+
+Enable virtualization to only render visible rows:
+
+```javascript
+<ReactDiffViewer
+  oldValue={largeOldFile}
+  newValue={largeNewFile}
+  infiniteLoading={{
+    pageSize: 20,
+    containerHeight: '80vh'
+  }}
+  loadingElement={() => (
+    <div style={{ padding: '20px', textAlign: 'center' }}>
+      Computing diff...
+    </div>
+  )}
+/>
+```
+
+When `infiniteLoading` is enabled:
+- Only visible rows are rendered (virtualization)
+- Word-level diffs are computed on-demand as lines become visible
+- A loading element can be shown while the initial diff is computed
+
+### Use optimized diff methods for structured data
+
+For JSON and YAML files, always use the dedicated diff methods:
+
+```javascript
+// For JSON files - up to 100x faster for large files
+<ReactDiffViewer
+  oldValue={jsonObject}
+  newValue={newJsonObject}
+  compareMethod={DiffMethod.JSON}
+/>
+
+// For YAML files
+<ReactDiffViewer
+  oldValue={yamlString}
+  newValue={newYamlString}
+  compareMethod={DiffMethod.YAML}
+/>
+```
+
+See [JSON and YAML diffing](#json-and-yaml-diffing) for more details.
 
 ## Syntax Highlighting
 
@@ -113,7 +169,7 @@ An example using [Prism JS](https://prismjs.com)
 
 ```javascript
 import React, { PureComponent } from 'react';
-import ReactDiffViewer from 'react-diff-viewer';
+import ReactDiffViewer from 'react-diff-viewer-continued';
 
 const oldCode = `
 const a = 10
@@ -160,7 +216,7 @@ class Diff extends PureComponent {
 
 ## Text block diff comparison
 
-Different styles of text block diffing are possible by using the enums corresponding to variou JsDiff methods ([learn more](https://github.com/kpdecker/jsdiff/tree/v4.0.1#api)). The supported methods are as follows.
+Different styles of text block diffing are possible by using the enums corresponding to various JsDiff methods ([learn more](https://github.com/kpdecker/jsdiff/tree/v4.0.1#api)). The supported methods are as follows.
 
 ```javascript
 enum DiffMethod {
@@ -171,25 +227,87 @@ enum DiffMethod {
   TRIMMED_LINES = 'diffTrimmedLines',
   SENTENCES = 'diffSentences',
   CSS = 'diffCss',
+  JSON = 'diffJson',  // Optimized for JSON files
+  YAML = 'diffYaml',  // Optimized for YAML files
 }
 ```
 
+### JSON and YAML diffing
+
+For JSON and YAML files, use the dedicated `DiffMethod.JSON` and `DiffMethod.YAML` methods. These use an optimized structural comparison algorithm that is **significantly faster** than generic text diff for large files.
+
+**Why use these methods?**
+
+Generic text diff algorithms (like `CHARS` or `WORDS`) compare files character-by-character using the Myers diff algorithm, which has O(ND) complexity where N is the file size and D is the number of differences. For large JSON/YAML files (thousands of lines), this can take several seconds or even freeze the browser.
+
+The `JSON` and `YAML` methods instead:
+1. Parse the data structure
+2. Compare objects/arrays structurally
+3. Only run text diff on the parts that actually differ
+
+This reduces comparison time from seconds to milliseconds for typical configuration files.
+
+```javascript
+import React from 'react';
+import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
+
+// For JSON - can pass objects directly
+const oldJson = { name: "Original", items: [1, 2, 3] };
+const newJson = { name: "Updated", items: [1, 2, 3, 4] };
+
+// For YAML - pass as strings
+const oldYaml = `
+name: Original
+items:
+  - 1
+  - 2
+`;
+const newYaml = `
+name: Updated
+items:
+  - 1
+  - 2
+  - 3
+`;
+
+function JsonDiff() {
+  return (
+    <ReactDiffViewer
+      oldValue={oldJson}
+      newValue={newJson}
+      compareMethod={DiffMethod.JSON}
+      splitView={true}
+    />
+  );
+}
+
+function YamlDiff() {
+  return (
+    <ReactDiffViewer
+      oldValue={oldYaml}
+      newValue={newYaml}
+      compareMethod={DiffMethod.YAML}
+      splitView={true}
+    />
+  );
+}
+```
+
+### Other diff methods
+
+For regular code or text files, use the standard diff methods:
+
 ```javascript
 import React, { PureComponent } from 'react';
-import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer';
+import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
 
 const oldCode = `
-{
-  "name": "Original name",
-  "description": null
-}
+const a = 10
+const b = 10
 `;
 const newCode = `
-{
-  "name": "My updated name",
-  "description": "Brand new description",
-  "status": "running"
-}
+const a = 10
+const boo = 10
 `;
 
 class Diff extends PureComponent {
@@ -300,7 +418,7 @@ For keys other than `variables`, the value can either be an object or string int
 
 ```javascript
 import React, { PureComponent } from 'react';
-import ReactDiffViewer from 'react-diff-viewer';
+import ReactDiffViewer from 'react-diff-viewer-continued';
 
 const oldCode = `
 const a = 10

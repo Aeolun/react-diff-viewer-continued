@@ -3,7 +3,11 @@
     "allow": [
       "WebSearch",
       "Bash(pnpm add:*)",
-      "Bash(npx playwright:*)"
+      "Bash(npx playwright:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm test:*)",
+      "Bash(CI=1 pnpm test:*)",
+      "Bash(CI=1 npm test:*)"
     ],
     "deny": [],
     "ask": []

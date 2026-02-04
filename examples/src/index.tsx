@@ -22,6 +22,7 @@ interface ExampleState {
   lineNumbers: boolean;
   theme: 'dark' | 'light';
   enableSyntaxHighlighting?: boolean;
+  hideSummary: boolean;
   columnHeaders: boolean;
   compareMethod?: DiffMethod;
   dataType: string;
@@ -39,9 +40,10 @@ class Example extends Component<{}, ExampleState> {
       highlightLine: [],
       theme: 'dark',
       splitView: true,
+      hideSummary: false,
       columnHeaders: true,
       lineNumbers: true,
-      customGutter: true,
+      customGutter: false,
       enableSyntaxHighlighting: true,
       dataType: 'javascript',
       compareMethod: DiffMethod.CHARS,
@@ -178,6 +180,21 @@ class Example extends Component<{}, ExampleState> {
               <label className={'switch'}>
                 <input
                   type="checkbox"
+                  checked={!this.state.hideSummary}
+                  onChange={() => {
+                    this.setState({
+                      hideSummary: !this.state.hideSummary,
+                    });
+                  }}
+                />
+                <span className="slider round"></span>
+              </label>
+              <span>Show Summary</span>
+            </div>
+            <div>
+              <label className={'switch'}>
+                <input
+                  type="checkbox"
                   checked={this.state.columnHeaders}
                   onChange={() => {
                     this.setState({
@@ -255,9 +272,18 @@ class Example extends Component<{}, ExampleState> {
                 <select
                   value={this.state.dataType}
                   onChange={(e) => {
+                    const newDataType = e.currentTarget.value;
+                    let newCompareMethod = this.state.compareMethod;
+                    if (newDataType === 'json') {
+                      newCompareMethod = DiffMethod.JSON;
+                    } else if (newDataType === 'yaml') {
+                      newCompareMethod = DiffMethod.YAML;
+                    } else if (this.state.compareMethod === DiffMethod.JSON || this.state.compareMethod === DiffMethod.YAML) {
+                      newCompareMethod = DiffMethod.CHARS;
+                    }
                     this.setState({
-                      dataType: e.currentTarget.value,
-                      compareMethod: e.currentTarget.value === 'json' ? DiffMethod.JSON : DiffMethod.CHARS
+                      dataType: newDataType,
+                      compareMethod: newCompareMethod
                     });
                   }}
                 >
@@ -267,6 +293,30 @@ class Example extends Component<{}, ExampleState> {
                 </select>
               </label>
               <span>Data</span>
+            </div>
+            <div>
+              <label className={'select'}>
+                <select
+                  value={this.state.compareMethod}
+                  onChange={(e) => {
+                    this.setState({
+                      compareMethod: e.currentTarget.value as DiffMethod
+                    });
+                  }}
+                  disabled={this.state.dataType === 'json' || this.state.dataType === 'yaml'}
+                >
+                  <option value={DiffMethod.CHARS}>Characters</option>
+                  <option value={DiffMethod.WORDS}>Words</option>
+                  <option value={DiffMethod.WORDS_WITH_SPACE}>Words with space</option>
+                  <option value={DiffMethod.LINES}>Lines</option>
+                  <option value={DiffMethod.TRIMMED_LINES}>Trimmed lines</option>
+                  <option value={DiffMethod.SENTENCES}>Sentences</option>
+                  <option value={DiffMethod.CSS}>CSS</option>
+                  <option value={DiffMethod.JSON}>JSON</option>
+                  <option value={DiffMethod.YAML}>YAML</option>
+                </select>
+              </label>
+              <span>Diff method</span>
             </div>
           </div>
         </div>
@@ -319,6 +369,7 @@ class Example extends Component<{}, ExampleState> {
                 : undefined
             }
             useDarkTheme={this.state.theme === 'dark'}
+            hideSummary={this.state.hideSummary}
             summary={this.state.compareMethod === DiffMethod.JSON ? 'package.json' : 'webpack.config.js'}
             leftTitle={this.state.columnHeaders ? `master@2178133 - pushed 2 hours ago.` : undefined}
             rightTitle={this.state.columnHeaders ? `master@64207ee - pushed 13 hours ago.` : undefined}

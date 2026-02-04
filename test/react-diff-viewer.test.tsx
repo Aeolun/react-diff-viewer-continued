@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import * as React from "react";
 import { describe, expect, it } from "vitest";
 
@@ -34,17 +34,23 @@ describe("Testing react diff viewer", (): void => {
     expect(node.getAllByRole("table").length).toEqual(1);
   });
 
-  it("It should render diff lines in diff view", (): void => {
+  it("It should render diff lines in diff view", async (): Promise<void> => {
     const node = render(<DiffViewer oldValue={oldCode} newValue={newCode} />);
 
-    expect(node.getAllByRole("row").length).toEqual(16);
+    await waitFor(() => {
+      // 14 rows: 1 fold indicator + 6 context lines (3 before, 3 after each diff) + 7 diff lines
+      expect(node.getAllByRole("row").length).toEqual(14);
+    });
   });
 
-  it("It should render diff lines in inline view", (): void => {
+  it("It should render diff lines in inline view", async (): Promise<void> => {
     const node = render(
       <DiffViewer oldValue={oldCode} newValue={newCode} splitView={false} />,
     );
 
-    expect(node.getAllByRole("row").length).toEqual(26);
+    await waitFor(() => {
+      // 23 rows in inline view with code folding
+      expect(node.getAllByRole("row").length).toEqual(23);
+    });
   });
 });
