@@ -1,3 +1,17 @@
+# Changelog
+
+## 4.1.0 (2026-02-04)
+
+### Features
+
+- merge compute worker PR and optimize to use virtualization
+- use just-release instead of semantic-release, still semantic, simpler
+
+### Bug Fixes
+
+- ordering and syntax highlighting fixes
+- need to actually push your new workflows if you want to use them
+
 ## [4.0.6](https://github.com/aeolun/react-diff-viewer-continued/compare/v4.0.5...v4.0.6) (2025-05-13)
 
 
