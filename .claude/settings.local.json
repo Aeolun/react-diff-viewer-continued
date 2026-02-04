@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(pnpm add:*)",
+      "Bash(npx playwright:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

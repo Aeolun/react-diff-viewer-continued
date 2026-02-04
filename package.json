@@ -38,6 +38,13 @@
     "start:examples": "vite examples",
     "dev": "vite dev examples",
     "test": "vitest",
+    "test:visual": "playwright test",
+    "test:visual:basic": "playwright test tests/visual/basic.spec.ts",
+    "test:visual:basic:update": "playwright test tests/visual/basic.spec.ts --update-snapshots",
+    "test:visual:ui": "playwright test --ui",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:debug": "playwright test --debug",
+    "test:visual:headed": "playwright test --headed",
     "check": "biome check src/ test/",
     "check:fix": "biome check --write --unsafe src/ test/"
   },
@@ -50,6 +57,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.55.0",
     "@semantic-release/changelog": "6.0.1",
     "@semantic-release/git": "10.0.1",
     "@testing-library/react": "^13.4.0",
