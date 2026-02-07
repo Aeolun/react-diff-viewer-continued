@@ -547,16 +547,6 @@ describe("JSON string key order preservation", (): void => {
 
     const result = computeLineInformation(oldJson, newJson, true, DiffMethod.JSON);
 
-    console.log("=== JSON String Diff Debug ===");
-    for (const line of result.lineInformation) {
-      const leftVal = line.left?.value;
-      const rightVal = line.right?.value;
-      const leftType = line.left?.type;
-      const rightType = line.right?.type;
-      console.log(`L[${leftType}]: ${JSON.stringify(leftVal)} | R[${rightType}]: ${JSON.stringify(rightVal)}`);
-    }
-    console.log("diffLines:", result.diffLines);
-
     // Check that every line with a value has proper structure
     for (const line of result.lineInformation) {
       const leftVal = typeof line.left?.value === 'string' ? line.left.value.trim() : '';
@@ -568,9 +558,6 @@ describe("JSON string key order preservation", (): void => {
           const hasColon = val.includes(':');
           const isJustValue = !isStructural && !hasColon && val.match(/^"[^"]*"[,]?$/);
 
-          if (isJustValue) {
-            console.error(`Found orphan value without key: ${val}`);
-          }
           expect(isJustValue).toBe(false);
         }
       }
@@ -596,17 +583,6 @@ describe("JSON string key order preservation", (): void => {
     // Pass objects directly - this uses structural diff
     const result = computeLineInformation(oldObj, newObj, true, DiffMethod.JSON);
 
-    // Debug: print all line information
-    console.log("=== JSON Object (Structural) Diff Debug ===");
-    for (const line of result.lineInformation) {
-      const leftVal = line.left?.value;
-      const rightVal = line.right?.value;
-      const leftType = line.left?.type;
-      const rightType = line.right?.type;
-      console.log(`L[${leftType}]: ${JSON.stringify(leftVal)} | R[${rightType}]: ${JSON.stringify(rightVal)}`);
-    }
-    console.log("diffLines:", result.diffLines);
-
     // Check that every line with a value has proper structure
     for (const line of result.lineInformation) {
       const leftVal = typeof line.left?.value === 'string' ? line.left.value.trim() : '';
@@ -618,9 +594,6 @@ describe("JSON string key order preservation", (): void => {
           const hasColon = val.includes(':');
           const isJustValue = !isStructural && !hasColon && val.match(/^"[^"]*"[,]?$/);
 
-          if (isJustValue) {
-            console.error(`Found orphan value without key: ${val}`);
-          }
           expect(isJustValue).toBe(false);
         }
       }
@@ -646,23 +619,6 @@ describe("JSON string key order preservation", (): void => {
     // This is how the examples app uses it - objects with DiffMethod.JSON
     const result = computeLineInformation(oldObj, newObj, false, DiffMethod.JSON);
 
-    console.log("=== Example JSON Files Diff ===");
-    for (const line of result.lineInformation) {
-      const leftVal = line.left?.value;
-      const rightVal = line.right?.value;
-      const leftType = line.left?.type;
-      const rightType = line.right?.type;
-
-      const leftStr = Array.isArray(leftVal)
-        ? leftVal.map(d => typeof d.value === 'string' ? d.value : '').join('')
-        : leftVal;
-      const rightStr = Array.isArray(rightVal)
-        ? rightVal.map(d => typeof d.value === 'string' ? d.value : '').join('')
-        : rightVal;
-
-      console.log(`L[${leftType}]: ${JSON.stringify(leftStr)} | R[${rightType}]: ${JSON.stringify(rightStr)}`);
-    }
-
     // Check for orphan values
     for (const line of result.lineInformation) {
       const getFullValue = (val: unknown): string => {
@@ -682,9 +638,6 @@ describe("JSON string key order preservation", (): void => {
           const hasColon = val.includes(':');
           const isJustValue = !isStructural && !hasColon && val.match(/^"[^"]*"[,]?$/);
 
-          if (isJustValue) {
-            console.error(`ORPHAN VALUE FOUND: ${val}`);
-          }
           expect(isJustValue).toBe(false);
         }
       }
@@ -710,26 +663,6 @@ describe("JSON string key order preservation", (): void => {
     // Pass objects with word diff ENABLED (disableWordDiff = false)
     const result = computeLineInformation(oldObj, newObj, false, DiffMethod.JSON);
 
-    // Debug: print all line information including word diff arrays
-    console.log("=== JSON Object with Word Diff Debug ===");
-    for (const line of result.lineInformation) {
-      const leftVal = line.left?.value;
-      const rightVal = line.right?.value;
-      const leftType = line.left?.type;
-      const rightType = line.right?.type;
-
-      // For word diff, value might be an array - reconstruct full line
-      const leftStr = Array.isArray(leftVal)
-        ? leftVal.map(d => typeof d.value === 'string' ? d.value : '').join('')
-        : leftVal;
-      const rightStr = Array.isArray(rightVal)
-        ? rightVal.map(d => typeof d.value === 'string' ? d.value : '').join('')
-        : rightVal;
-
-      console.log(`L[${leftType}]: ${JSON.stringify(leftStr)} | R[${rightType}]: ${JSON.stringify(rightStr)}`);
-    }
-    console.log("diffLines:", result.diffLines);
-
     // Check that every line with a value has proper structure
     // No line should be just a bare value like "value2" without a key
     for (const line of result.lineInformation) {
@@ -752,9 +685,6 @@ describe("JSON string key order preservation", (): void => {
           const hasColon = val.includes(':');
           const isJustValue = !isStructural && !hasColon && val.match(/^"[^"]*"[,]?$/);
 
-          if (isJustValue) {
-            console.error(`Found orphan value without key: ${val}`);
-          }
           expect(isJustValue).toBe(false);
         }
       }
@@ -767,10 +697,6 @@ describe("Full example JSON file diff", (): void => {
     // Use the actual example files - these are imported as objects (not strings)
     const result = computeLineInformation(oldJson, newJson, false, DiffMethod.JSON);
 
-    console.log("=== Full Example JSON Diff ===");
-    console.log(`Total lines in diff: ${result.lineInformation.length}`);
-    console.log(`Diff lines (changed): ${result.diffLines.length}`);
-
     // Helper to extract string value from line
     const getFullValue = (val: unknown): string => {
       if (typeof val === 'string') return val;
@@ -782,18 +708,11 @@ describe("Full example JSON file diff", (): void => {
 
     // Check for orphan values (values without keys)
     const orphanValues: string[] = [];
-    const allLeftLines: string[] = [];
-    const allRightLines: string[] = [];
 
     for (let i = 0; i < result.lineInformation.length; i++) {
       const line = result.lineInformation[i];
       const leftVal = getFullValue(line.left?.value);
       const rightVal = getFullValue(line.right?.value);
-      const leftType = line.left?.type;
-      const rightType = line.right?.type;
-
-      allLeftLines.push(leftVal);
-      allRightLines.push(rightVal);
 
       // Check for orphan values
       for (const val of [leftVal, rightVal]) {
@@ -808,28 +727,10 @@ describe("Full example JSON file diff", (): void => {
           }
         }
       }
-
-      // Log first 20 lines and any changed lines
-      if (i < 20 || leftType === 2 || rightType === 1) {
-        console.log(`[${i}] L[${leftType}]: ${JSON.stringify(leftVal.substring(0, 80))}${leftVal.length > 80 ? '...' : ''}`);
-        console.log(`[${i}] R[${rightType}]: ${JSON.stringify(rightVal.substring(0, 80))}${rightVal.length > 80 ? '...' : ''}`);
-      }
-    }
-
-    if (orphanValues.length > 0) {
-      console.error("=== ORPHAN VALUES FOUND ===");
-      orphanValues.forEach(v => console.error(v));
     }
 
     // Verify no orphan values
     expect(orphanValues.length).toBe(0);
-
-    // Reconstruct the left and right content
-    const leftContent = allLeftLines.join('\n');
-    const rightContent = allRightLines.join('\n');
-
-    console.log(`Left content length: ${leftContent.length} chars`);
-    console.log(`Right content length: ${rightContent.length} chars`);
 
     // Basic sanity checks
     expect(result.lineInformation.length).toBeGreaterThan(0);
@@ -839,33 +740,19 @@ describe("Full example JSON file diff", (): void => {
   it("Should have correct line count for example JSON", (): void => {
     const result = computeLineInformation(oldJson, newJson, true, DiffMethod.JSON);
 
-    // Log summary
-    console.log("=== Line Count Summary ===");
-    console.log(`lineInformation.length: ${result.lineInformation.length}`);
-    console.log(`diffLines: ${result.diffLines}`);
-
     // Count lines by type
     let addedCount = 0;
     let removedCount = 0;
     let unchangedCount = 0;
-    let emptyLeftCount = 0;
-    let emptyRightCount = 0;
 
     for (const line of result.lineInformation) {
       if (line.left?.type === 2) removedCount++;
       if (line.right?.type === 1) addedCount++;
       if (line.left?.type === 0 && line.right?.type === 0) unchangedCount++;
-      if (!line.left?.value && line.right?.value) emptyLeftCount++;
-      if (line.left?.value && !line.right?.value) emptyRightCount++;
     }
 
-    console.log(`Added lines: ${addedCount}`);
-    console.log(`Removed lines: ${removedCount}`);
-    console.log(`Unchanged lines: ${unchangedCount}`);
-    console.log(`Empty left (right only): ${emptyLeftCount}`);
-    console.log(`Empty right (left only): ${emptyRightCount}`);
-
     expect(result.lineInformation.length).toBeGreaterThan(100); // Should be a large file
+    expect(addedCount + removedCount + unchangedCount).toBeGreaterThan(0);
   });
 });
 
@@ -875,7 +762,6 @@ describe("Performance tests", (): void => {
     const result = computeLineInformation(oldJson, newJson, true, DiffMethod.JSON);
     const duration = performance.now() - start;
 
-    console.log(`Example JSON diff (6004 lines each, structural): ${duration.toFixed(2)}ms`);
     expect(result.lineInformation.length).toBeGreaterThan(0);
     expect(duration).toBeLessThan(5000); // Should complete in under 5 seconds
   });
@@ -928,24 +814,16 @@ describe("Performance tests", (): void => {
     const optimizedChangedLines = optimizedResult.diffLines.length;
     const naiveChangedChunks = naiveDiff.filter(c => c.added || c.removed).length;
 
-    console.log(`JSON diff consistency: optimized found ${optimizedChangedLines} changed line indices`);
-    console.log(`JSON diff consistency: naive found ${naiveChangedChunks} changed chunks`);
-    console.log(`JSON diff consistency: both contain the expected modifications`);
-
     // Both should have found changes
     expect(optimizedChangedLines).toBeGreaterThan(0);
     expect(naiveChangedChunks).toBeGreaterThan(0);
   });
 
   it("Should handle YAML files efficiently (structural diff)", (): void => {
-    const oldLines = oldYaml.split('\n').length;
-    const newLines = newYaml.split('\n').length;
-
     const start = performance.now();
     const result = computeLineInformation(oldYaml, newYaml, true, DiffMethod.YAML);
     const duration = performance.now() - start;
 
-    console.log(`YAML diff (${oldLines}/${newLines} lines, structural): ${duration.toFixed(2)}ms`);
     expect(result.lineInformation.length).toBeGreaterThan(0);
     expect(duration).toBeLessThan(5000); // Should complete in under 5 seconds
   });
@@ -984,8 +862,6 @@ describe("Performance tests", (): void => {
 
     // Diff line indices should match
     expect(optimizedResult.diffLines).toEqual(naiveResult.diffLines);
-
-    console.log(`YAML diff consistency check passed: ${optimizedResult.lineInformation.length} lines, ${optimizedResult.diffLines.length} changes`);
   });
 
   it("Compare: highly different JSON (worst case for Myers)", (): void => {
@@ -1016,7 +892,8 @@ describe("Performance tests", (): void => {
       diff.diffJson(oldData, newData);
       const originalDuration = performance.now() - startOriginal;
 
-      console.log(`${size} keys (all different) - Structural: ${structuralDuration.toFixed(2)}ms, Original: ${originalDuration.toFixed(2)}ms, Speedup: ${(originalDuration / structuralDuration).toFixed(1)}x`);
+      // Structural diff should be reasonably fast
+      expect(structuralDuration).toBeLessThan(5000);
     }
   });
 
@@ -1032,7 +909,6 @@ describe("Performance tests", (): void => {
     const result = computeLineInformation(oldString, newString, true, DiffMethod.LINES);
     const duration = performance.now() - start;
 
-    console.log(`Large string diff (5000 lines): ${duration.toFixed(2)}ms`);
     expect(result.lineInformation.length).toBeGreaterThan(0);
     expect(duration).toBeLessThan(5000); // Should complete in under 5 seconds
   });
@@ -1048,7 +924,6 @@ describe("Performance tests", (): void => {
     const result = computeLineInformation(oldJson, newJson, true, DiffMethod.JSON);
     const duration = performance.now() - start;
 
-    console.log(`Large JSON diff (500 keys): ${duration.toFixed(2)}ms`);
     expect(result.lineInformation.length).toBeGreaterThan(0);
     expect(duration).toBeLessThan(5000); // Should complete in under 5 seconds
   });

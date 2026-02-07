@@ -31,7 +31,8 @@
   "module": "lib/esm/src/index",
   "typings": "lib/cjs/src/index",
   "scripts": {
-    "build": "tsc --project tsconfig.json && tsc --project tsconfig.esm.json && sed -i 's/computeWorker\\.ts/computeWorker.js/g' lib/cjs/src/compute-lines.js lib/esm/src/compute-lines.js",
+    "build:worker": "node scripts/build-worker.js",
+    "build": "pnpm run build:worker && tsc --project tsconfig.json && tsc --project tsconfig.esm.json",
     "build:examples": "vite build examples",
     "publish:examples": "NODE_ENV=production pnpm run build:examples && gh-pages -d examples/dist -r $GITHUB_REPO_URL",
     "publish:examples:local": "NODE_ENV=production pnpm run build:examples && gh-pages -d examples/dist",
@@ -57,6 +58,7 @@
     "@types/node": "^25.2.0",
     "@types/react": "^19.2.11",
     "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.27.3",
     "gh-pages": "^6.3.0",
     "happy-dom": "^20.5.0",
     "just-release": "^0.7.0",

@@ -197,14 +197,11 @@ describe('offset calculation mismatch', () => {
 
     // The visibleRowEnd should be at least start + rows needed
     // This test documents the BUG - it will fail until we fix it
-    const minimumRowEndNeeded = visibleRowStart + actualRowsNeededToFillViewport;
+    const _minimumRowEndNeeded = visibleRowStart + actualRowsNeededToFillViewport;
 
-    // Current behavior: visibleRowEnd is based on calculated offsets
-    // This might not be enough rows to fill the actual viewport
-    console.log(`visibleRowStart: ${visibleRowStart}`);
-    console.log(`visibleRowEnd: ${visibleRowEnd}`);
-    console.log(`actualRowsNeededToFillViewport: ${actualRowsNeededToFillViewport}`);
-    console.log(`minimumRowEndNeeded: ${minimumRowEndNeeded}`);
+    // Verify that we calculate something reasonable
+    expect(visibleRowStart).toBeGreaterThanOrEqual(0);
+    expect(visibleRowEnd).toBeGreaterThan(visibleRowStart);
   });
 });
 
@@ -297,12 +294,6 @@ describe('visibility edge cases', () => {
     const rowHeight = 19; // DiffViewer.ESTIMATED_ROW_HEIGHT
     const offsets = buildUniformOffsets(rowCount, rowHeight);
 
-    console.log("=== Large File Virtualization Test ===");
-    console.log(`rowCount: ${rowCount}`);
-    console.log(`offsets.length: ${offsets.length}`);
-    console.log(`totalHeight (offsets[last]): ${offsets[offsets.length - 1]}`);
-    console.log(`Expected totalHeight: ${rowCount * rowHeight}`);
-
     // Verify offsets array has correct structure
     expect(offsets.length).toBe(rowCount + 1); // One entry per row + 1 for end
     expect(offsets[0]).toBe(0);
@@ -315,27 +306,21 @@ describe('visibility edge cases', () => {
     const { visibleRowStart: start1, visibleRowEnd: end1 } = calculateVisibleRange(0, viewportHeight, offsets, 5);
     expect(start1).toBe(0);
     expect(end1).toBeGreaterThan(0);
-    console.log(`At top: visibleRowStart=${start1}, visibleRowEnd=${end1}`);
 
     // Test scroll in middle
     const midScroll = Math.floor(totalHeight / 2);
     const { visibleRowStart: start2, visibleRowEnd: end2 } = calculateVisibleRange(midScroll, viewportHeight, offsets, 5);
-    console.log(`At middle (scroll=${midScroll}): visibleRowStart=${start2}, visibleRowEnd=${end2}`);
     expect(start2).toBeGreaterThan(0);
     expect(end2).toBeGreaterThan(start2);
 
     // Test scroll at bottom
     const bottomScroll = totalHeight - viewportHeight;
-    const { visibleRowStart: start3, visibleRowEnd: end3 } = calculateVisibleRange(bottomScroll, viewportHeight, offsets, 5);
-    console.log(`At bottom (scroll=${bottomScroll}): visibleRowStart=${start3}, visibleRowEnd=${end3}`);
+    const { visibleRowStart: _start3, visibleRowEnd: end3 } = calculateVisibleRange(bottomScroll, viewportHeight, offsets, 5);
     expect(end3).toBeGreaterThanOrEqual(rowCount - 1); // Should be able to see last row
 
     // Calculate bottom padding at various scroll positions
     const lastRenderedRowIndex = Math.min(end3, rowCount - 1);
     const bottomPadding = totalHeight - (offsets[lastRenderedRowIndex + 1] || totalHeight);
-    console.log(`bottomPadding at scroll ${bottomScroll}: ${bottomPadding}`);
-    console.log(`lastRenderedRowIndex: ${lastRenderedRowIndex}`);
-    console.log(`offsets[lastRenderedRowIndex + 1]: ${offsets[lastRenderedRowIndex + 1]}`);
 
     // Bottom padding should be 0 or very small when scrolled to bottom
     expect(bottomPadding).toBeLessThanOrEqual(rowHeight * 5); // At most 5 rows of padding

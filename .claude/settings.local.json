@@ -13,7 +13,9 @@
       "Bash(npx tsc:*)",
       "Bash(ls:*)",
       "Bash(pnpm run build:*)",
-      "Bash(pnpm exec vitest:*)"
+      "Bash(pnpm exec vitest:*)",
+      "Bash(grep:*)",
+      "Bash(pnpm run test:*)"
     ],
     "deny": [],
     "ask": []

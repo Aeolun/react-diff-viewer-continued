@@ -88,7 +88,6 @@ describe("Testing react diff viewer", (): void => {
     });
 
     const duration = performance.now() - start;
-    console.log(`Long noisy line diff (5000 chars, completely different): ${duration.toFixed(2)}ms`);
 
     // Should complete in under 2 seconds - the optimization skips word diff for long lines
     expect(duration).toBeLessThan(2000);
@@ -124,8 +123,6 @@ describe("Testing react diff viewer", (): void => {
 
     // Get all the rendered content
     const allContent = node.container.textContent || '';
-    console.log("=== Rendered JSON Diff Content ===");
-    console.log(allContent);
 
     // Check that we don't have orphan values without keys
     // The content should NOT have "value2" appearing without "key1:" before it
@@ -133,10 +130,7 @@ describe("Testing react diff viewer", (): void => {
     for (const line of lines) {
       const trimmed = line.trim();
       // Check for orphan values - a line that's just "value2" or "value2," without a key
-      if (trimmed.match(/^"value\d+"[,]?$/)) {
-        console.error(`ORPHAN VALUE IN RENDERED OUTPUT: ${trimmed}`);
-        expect(trimmed).not.toMatch(/^"value\d+"[,]?$/);
-      }
+      expect(trimmed).not.toMatch(/^"value\d+"[,]?$/);
     }
   });
 });

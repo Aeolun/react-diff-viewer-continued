@@ -2,3 +2,5 @@ node_modules
 dist
 lib
 *.log
+# Auto-generated worker bundle
+src/workerBundle.ts
