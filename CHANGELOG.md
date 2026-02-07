@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.3 (2026-02-07)
+
+### Bug Fixes
+
+- attempt to fix worker import issue
+
 ## 4.1.2 (2026-02-07)
 
 ### Bug Fixes
