@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.1.2 (2026-02-07)
+
+### Bug Fixes
+
+- fix virtualization offsets and missing key display on structural json diff
+- bundle worker code as a blob
+
 ## 4.1.1 (2026-02-07)
 
 ### Bug Fixes
