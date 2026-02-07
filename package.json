@@ -31,7 +31,7 @@
   "module": "lib/esm/src/index",
   "typings": "lib/cjs/src/index",
   "scripts": {
-    "build": "tsc --project tsconfig.json && tsc --project tsconfig.esm.json",
+    "build": "tsc --project tsconfig.json && tsc --project tsconfig.esm.json && sed -i 's/computeWorker\\.ts/computeWorker.js/g' lib/cjs/src/compute-lines.js lib/esm/src/compute-lines.js",
     "build:examples": "vite build examples",
     "publish:examples": "NODE_ENV=production pnpm run build:examples && gh-pages -d examples/dist -r $GITHUB_REPO_URL",
     "publish:examples:local": "NODE_ENV=production pnpm run build:examples && gh-pages -d examples/dist",

@@ -8,7 +8,12 @@
       "Bash(pnpm test:*)",
       "Bash(CI=1 pnpm test:*)",
       "Bash(CI=1 npm test:*)",
-      "Bash(pnpm remove:*)"
+      "Bash(pnpm remove:*)",
+      "Bash(npm test:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm exec vitest:*)"
     ],
     "deny": [],
     "ask": []

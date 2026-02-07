@@ -652,24 +652,32 @@ const computeLineInformationWorker = (
   showLines: string[] = [],
   deferWordDiff = false
 ): Promise<ComputedLineInformation> => {
+  const fallback = () => computeLineInformation(oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff);
+
   // Fall back to synchronous computation if Worker is not available (e.g., in Node.js/test environments)
   if (typeof Worker === 'undefined') {
-    return Promise.resolve(
-      computeLineInformation(oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff)
-    );
+    return Promise.resolve(fallback());
   }
 
-  return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./computeWorker.ts', import.meta.url), { type: 'module' });
+  return new Promise((resolve) => {
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./computeWorker.ts', import.meta.url), { type: 'module' });
+    } catch {
+      // Worker instantiation failed - fall back to synchronous computation
+      resolve(fallback());
+      return;
+    }
 
     worker.onmessage = (e) => {
       resolve(e.data);
       worker.terminate();
     };
 
-    worker.onerror = (err) => {
-      reject(err);
+    worker.onerror = () => {
+      // Worker error - fall back to synchronous computation
       worker.terminate();
+      resolve(fallback());
     };
 
     worker.postMessage({ oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff });

@@ -30,6 +30,7 @@ export interface ReactDiffViewerStyles {
   content?: string;
   column?: string;
   noSelect?: string;
+  noWrap?: string;
   splitView?: string;
   allExpandButton?: string;
   [key: string]: string | undefined;
@@ -172,6 +173,7 @@ export default (
 
   const content = css({
     width: "auto",
+    overflow: "hidden",
     label: "content",
   });
 
@@ -218,6 +220,9 @@ export default (
     },
     label: "diff-container",
     borderCollapse: "collapse",
+    "@media (max-width: 768px)": {
+      minWidth: "unset",
+    },
   });
 
   const lineContent = css({
@@ -237,6 +242,17 @@ export default (
   const unselectable = css({
     userSelect: "none",
     label: "unselectable",
+  });
+
+  const noWrap = css({
+    label: "no-wrap",
+    pre: {
+      whiteSpace: "pre",
+    },
+    [`.${contentText}`]: {
+      whiteSpace: "pre",
+      lineBreak: "auto",
+    },
   });
 
   const allExpandButton = css({
@@ -510,6 +526,7 @@ export default (
     blockDeletion,
     wordRemoved,
     noSelect: unselectable,
+    noWrap,
     codeFoldGutter,
     codeFoldExpandButton,
     codeFoldContentContainer,

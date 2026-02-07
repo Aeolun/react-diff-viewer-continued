@@ -280,6 +280,10 @@ export interface ReactDiffViewerProps {
    * Hide the summary bar (expand/collapse button, change count, filename)
    */
   hideSummary?: boolean
+  /**
+   * Show debug overlay with virtualization info (for development)
+   */
+  showDebugInfo?: boolean
 }
 
 export interface ReactDiffViewerState {
@@ -291,6 +295,10 @@ export interface ReactDiffViewerState {
   isLoading: boolean
   // For virtualization: the first visible row index
   visibleStartRow: number
+  // For variable row heights with text wrapping
+  contentColumnWidth: number | null;
+  charWidth: number | null;
+  cumulativeOffsets: number[] | null;
 }
 
 class DiffViewer extends React.Component<
@@ -301,6 +309,12 @@ class DiffViewer extends React.Component<
 
   // Cache for on-demand word diff computation
   private wordDiffCache: Map<string, { left: DiffInformation[]; right: DiffInformation[] }> = new Map();
+
+  // Refs for measuring content column width and character width
+  private contentColumnRef: RefObject<HTMLTableCellElement | null> = React.createRef();
+  private charMeasureRef: RefObject<HTMLSpanElement | null> = React.createRef();
+  private stickyHeaderRef: RefObject<HTMLDivElement | null> = React.createRef();
+  private resizeObserver: ResizeObserver | null = null;
 
   public static defaultProps: ReactDiffViewerProps = {
     oldValue: "",
@@ -327,7 +341,10 @@ class DiffViewer extends React.Component<
       scrollableContainerRef: React.createRef(),
       computedDiffResult: {},
       isLoading: false,
-      visibleStartRow: 0
+      visibleStartRow: 0,
+      contentColumnWidth: null,
+      charWidth: null,
+      cumulativeOffsets: null,
     };
   }
 
@@ -392,8 +409,161 @@ class DiffViewer extends React.Component<
     const prevState = this.state.expandedBlocks.slice();
     prevState.push(id);
 
-    this.setState({
-      expandedBlocks: prevState,
+    this.setState(
+      { expandedBlocks: prevState },
+      () => this.recalculateOffsets()
+    );
+  };
+
+  /**
+   * Gets the height of the sticky header, if present.
+   */
+  private getStickyHeaderHeight(): number {
+    return this.stickyHeaderRef.current?.offsetHeight || 0;
+  }
+
+  /**
+   * Measures the width of a single character in the monospace font.
+   * Falls back to 7.2px if measurement fails.
+   */
+  private measureCharWidth(): number {
+    const span = this.charMeasureRef.current;
+    if (!span) return 7.2; // fallback
+    return span.getBoundingClientRect().width || 7.2;
+  }
+
+  /**
+   * Measures the available width for content in a content column.
+   * Falls back to estimating from container width if direct measurement fails.
+   */
+  private measureContentColumnWidth(): number | null {
+    // Try direct measurement first
+    const cell = this.contentColumnRef.current;
+    if (cell && cell.clientWidth > 0) {
+      const style = window.getComputedStyle(cell);
+      const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const width = cell.clientWidth - padding;
+      if (width > 0) return width;
+    }
+
+    // Fallback: estimate from container width
+    // In split view: container has 2 content columns + gutters (50px each) + markers (28px each)
+    // In unified view: 1 content column + 2 gutters + 1 marker
+    const container = this.state.scrollableContainerRef.current;
+    if (!container || container.clientWidth <= 0) return null;
+
+    const containerWidth = container.clientWidth;
+    const gutterWidth = this.props.hideLineNumbers ? 0 : 50;
+    const markerWidth = 28;
+    const gutterCount = this.props.splitView ? 2 : 2; // left gutter(s)
+    const markerCount = this.props.splitView ? 2 : 1;
+    const contentColumns = this.props.splitView ? 2 : 1;
+
+    const fixedWidth = gutterCount * gutterWidth + markerCount * markerWidth;
+    const availableWidth = containerWidth - fixedWidth;
+    return Math.max(100, availableWidth / contentColumns); // minimum 100px
+  }
+
+  /**
+   * Gets the text length from a value that may be a string or DiffInformation array.
+   */
+  private getTextLength(value: string | DiffInformation[] | undefined): number {
+    if (!value) return 0;
+    if (typeof value === 'string') return value.length;
+    return value.reduce((sum, d) => sum + (typeof d.value === 'string' ? d.value.length : 0), 0);
+  }
+
+  /**
+   * Builds cumulative vertical offsets for each line based on character count and column width.
+   * This allows accurate scroll position calculations with variable row heights.
+   */
+  private buildCumulativeOffsets(
+    lineInformation: LineInformation[],
+    lineBlocks: Record<number, number>,
+    blocks: Block[],
+    expandedBlocks: number[],
+    showDiffOnly: boolean,
+    charWidth: number,
+    columnWidth: number,
+    splitView: boolean,
+  ): number[] {
+    const offsets: number[] = [0];
+    const seenBlocks = new Set<number>();
+
+    for (let i = 0; i < lineInformation.length; i++) {
+      const line = lineInformation[i];
+
+      if (showDiffOnly) {
+        const blockIndex = lineBlocks[i];
+        if (blockIndex !== undefined && !expandedBlocks.includes(blockIndex)) {
+          const isLastLine = blocks[blockIndex].endLine === i;
+          if (!seenBlocks.has(blockIndex) && isLastLine) {
+            seenBlocks.add(blockIndex);
+            offsets.push(offsets[offsets.length - 1] + DiffViewer.ESTIMATED_ROW_HEIGHT);
+          }
+          continue;
+        }
+      }
+
+      // Calculate visual rows for this line
+      const leftLen = line.left?.value ? this.getTextLength(line.left.value) : 0;
+      const rightLen = line.right?.value ? this.getTextLength(line.right.value) : 0;
+      const maxLen = splitView ? Math.max(leftLen, rightLen) : (leftLen || rightLen);
+      const charsPerRow = Math.floor(columnWidth / charWidth);
+      const visualRows = charsPerRow > 0 ? Math.max(1, Math.ceil(maxLen / charsPerRow)) : 1;
+
+      offsets.push(offsets[offsets.length - 1] + visualRows * DiffViewer.ESTIMATED_ROW_HEIGHT);
+    }
+
+    return offsets;
+  }
+
+  /**
+   * Binary search to find the line index at a given scroll offset.
+   */
+  private findLineAtOffset(scrollTop: number, offsets: number[]): number {
+    let low = 0;
+    let high = offsets.length - 2;
+    while (low < high) {
+      const mid = Math.floor((low + high + 1) / 2);
+      if (offsets[mid] <= scrollTop) {
+        low = mid;
+      } else {
+        high = mid - 1;
+      }
+    }
+    return low;
+  }
+
+  /**
+   * Recalculates cumulative offsets based on current measurements.
+   * Called on resize and when blocks are expanded/collapsed.
+   */
+  private recalculateOffsets = (): void => {
+    if (!this.props.infiniteLoading) return;
+
+    const columnWidth = this.measureContentColumnWidth();
+    const charWidth = this.measureCharWidth();
+    if (!columnWidth) return;
+
+    const cacheKey = this.getMemoisedKey();
+    const { lineInformation, lineBlocks, blocks } = this.state.computedDiffResult[cacheKey] ?? {};
+    if (!lineInformation) return;
+
+    const offsets = this.buildCumulativeOffsets(
+      lineInformation,
+      lineBlocks,
+      blocks,
+      this.state.expandedBlocks,
+      this.props.showDiffOnly,
+      charWidth,
+      columnWidth,
+      this.props.splitView,
+    );
+
+    this.setState({ cumulativeOffsets: offsets, contentColumnWidth: columnWidth, charWidth }, () => {
+      // Force a scroll position update to recalculate visible rows with new offsets
+      this.onScroll();
     });
   };
 
@@ -638,6 +808,7 @@ class DiffViewer extends React.Component<
           </pre>
         </td>
         <td
+          ref={prefix === LineNumberPrefix.LEFT && !this.state.cumulativeOffsets ? this.contentColumnRef : undefined}
           className={cn(this.styles.content, {
             [this.styles.emptyLine]: !content,
             [this.styles.diffAdded]: added,
@@ -970,7 +1141,13 @@ class DiffViewer extends React.Component<
       ...prev,
       computedDiffResult: this.state.computedDiffResult,
       isLoading: false,
-    }))
+    }), () => {
+      // Trigger offset recalculation after diff is computed and rendered
+      // Use requestAnimationFrame to ensure DOM is ready for measurement
+      if (this.props.infiniteLoading) {
+        requestAnimationFrame(() => this.recalculateOffsets());
+      }
+    })
   }
 
   // Estimated row height based on lineHeight: 1.6em with 12px base font
@@ -985,7 +1162,14 @@ class DiffViewer extends React.Component<
     const container = this.state.scrollableContainerRef.current
     if (!container || !this.props.infiniteLoading) return;
 
-    const newStartRow = Math.floor(container.scrollTop / DiffViewer.ESTIMATED_ROW_HEIGHT);
+    // Account for sticky header height in scroll calculations
+    const headerHeight = this.getStickyHeaderHeight();
+    const contentScrollTop = Math.max(0, container.scrollTop - headerHeight);
+
+    const { cumulativeOffsets } = this.state;
+    const newStartRow = cumulativeOffsets
+      ? this.findLineAtOffset(contentScrollTop, cumulativeOffsets)
+      : Math.floor(contentScrollTop / DiffViewer.ESTIMATED_ROW_HEIGHT);
 
     // Only update state if the start row changed (avoid unnecessary re-renders)
     if (newStartRow !== this.state.visibleStartRow) {
@@ -1002,9 +1186,23 @@ class DiffViewer extends React.Component<
     blocks: Block[];
     totalRenderedRows: number;
     topPadding: number;
+    bottomPadding: number;
+    totalContentHeight: number;
+    renderedCount: number;
+    debug: {
+      visibleRowStart: number;
+      visibleRowEnd: number;
+      totalRows: number;
+      offsetsLength: number;
+      renderedCount: number;
+      scrollTop: number;
+      headerHeight: number;
+      contentScrollTop: number;
+      clientHeight: number;
+    };
   } => {
     const { splitView, infiniteLoading, showDiffOnly } = this.props;
-    const { computedDiffResult, expandedBlocks, visibleStartRow, scrollableContainerRef } = this.state
+    const { computedDiffResult, expandedBlocks, visibleStartRow, scrollableContainerRef, cumulativeOffsets } = this.state
     const cacheKey = this.getMemoisedKey()
     const { lineInformation = [], lineBlocks = [], blocks = [] } = computedDiffResult[cacheKey] ?? {}
 
@@ -1015,9 +1213,35 @@ class DiffViewer extends React.Component<
 
     if (infiniteLoading && scrollableContainerRef.current) {
       const container = scrollableContainerRef.current;
-      const viewportRows = Math.ceil(container.clientHeight / DiffViewer.ESTIMATED_ROW_HEIGHT);
-      visibleRowStart = Math.max(0, visibleStartRow - buffer);
-      visibleRowEnd = visibleStartRow + viewportRows + buffer;
+      // Account for sticky header height in scroll calculations
+      const headerHeight = this.getStickyHeaderHeight();
+      const contentScrollTop = Math.max(0, container.scrollTop - headerHeight);
+
+      if (cumulativeOffsets) {
+        // Variable height mode: use binary search to find visible range
+        const totalHeight = cumulativeOffsets[cumulativeOffsets.length - 1] || 0;
+        const lastRowIndex = cumulativeOffsets.length - 2;
+
+        visibleRowStart = Math.max(0, this.findLineAtOffset(contentScrollTop, cumulativeOffsets) - buffer);
+        visibleRowEnd = this.findLineAtOffset(contentScrollTop + container.clientHeight, cumulativeOffsets) + buffer;
+
+        // IMPORTANT: The calculated offsets may overestimate row heights (based on char count),
+        // but actual CSS rendering might produce shorter rows. To prevent empty space,
+        // ensure we render at least enough rows to fill the viewport using ESTIMATED_ROW_HEIGHT
+        // as a conservative minimum.
+        const minRowsToFillViewport = Math.ceil(container.clientHeight / DiffViewer.ESTIMATED_ROW_HEIGHT);
+        visibleRowEnd = Math.max(visibleRowEnd, visibleRowStart + minRowsToFillViewport + buffer);
+
+        // Also ensure we render all rows when near the bottom
+        if (contentScrollTop + container.clientHeight >= totalHeight - buffer * DiffViewer.ESTIMATED_ROW_HEIGHT) {
+          visibleRowEnd = lastRowIndex + buffer;
+        }
+      } else {
+        // Fixed height fallback
+        const viewportRows = Math.ceil(container.clientHeight / DiffViewer.ESTIMATED_ROW_HEIGHT);
+        visibleRowStart = Math.max(0, visibleStartRow - buffer);
+        visibleRowEnd = visibleStartRow + viewportRows + buffer;
+      }
     }
 
     // First pass: build a map of lineIndex -> renderedRowIndex
@@ -1058,6 +1282,7 @@ class DiffViewer extends React.Component<
     const diffNodes: ReactElement[] = [];
     let topPadding = 0;
     let firstVisibleFound = false;
+    let lastRenderedRowIndex = -1;
     seenBlocks.clear();
 
     for (let lineIndex = 0; lineIndex < lineInformation.length; lineIndex++) {
@@ -1079,9 +1304,14 @@ class DiffViewer extends React.Component<
 
       // Calculate top padding from the first visible row
       if (!firstVisibleFound) {
-        topPadding = rowIndex * DiffViewer.ESTIMATED_ROW_HEIGHT;
+        topPadding = cumulativeOffsets
+          ? cumulativeOffsets[rowIndex] || 0
+          : rowIndex * DiffViewer.ESTIMATED_ROW_HEIGHT;
         firstVisibleFound = true;
       }
+
+      // Track the last rendered row for bottom padding calculation
+      lastRenderedRowIndex = rowIndex;
 
       // Render the line
       if (showDiffOnly) {
@@ -1118,12 +1348,39 @@ class DiffViewer extends React.Component<
       );
     }
 
+    // Calculate total content height
+    const totalContentHeight = cumulativeOffsets
+      ? cumulativeOffsets[cumulativeOffsets.length - 1] || 0
+      : totalRenderedRows * DiffViewer.ESTIMATED_ROW_HEIGHT;
+
+    // Calculate bottom padding: space after the last rendered row
+    const bottomPadding = cumulativeOffsets && lastRenderedRowIndex >= 0
+      ? totalContentHeight - (cumulativeOffsets[lastRenderedRowIndex + 1] || totalContentHeight)
+      : 0;
+
     return {
       diffNodes,
       blocks,
       lineInformation,
       totalRenderedRows,
       topPadding,
+      bottomPadding,
+      totalContentHeight,
+      renderedCount: diffNodes.length,
+      // Debug info
+      debug: {
+        visibleRowStart,
+        visibleRowEnd,
+        totalRows: totalRenderedRows,
+        offsetsLength: cumulativeOffsets?.length ?? 0,
+        renderedCount: diffNodes.length,
+        scrollTop: scrollableContainerRef.current?.scrollTop ?? 0,
+        headerHeight: this.getStickyHeaderHeight(),
+        contentScrollTop: scrollableContainerRef.current
+          ? Math.max(0, scrollableContainerRef.current.scrollTop - this.getStickyHeaderHeight())
+          : 0,
+        clientHeight: scrollableContainerRef.current?.clientHeight ?? 0,
+      }
     };
   };
 
@@ -1140,7 +1397,8 @@ class DiffViewer extends React.Component<
       this.setState((prev) => ({
         ...prev,
         isLoading: true,
-        visibleStartRow: 0
+        visibleStartRow: 0,
+        cumulativeOffsets: null as number[] | null,
       }))
       this.memoisedCompute();
     }
@@ -1152,6 +1410,21 @@ class DiffViewer extends React.Component<
       isLoading: true
     }))
     this.memoisedCompute();
+
+    // Set up ResizeObserver for recalculating offsets on container resize
+    if (typeof ResizeObserver !== 'undefined' && this.props.infiniteLoading) {
+      this.resizeObserver = new ResizeObserver(() => {
+        requestAnimationFrame(() => this.recalculateOffsets());
+      });
+      const container = this.state.scrollableContainerRef.current;
+      if (container) {
+        this.resizeObserver.observe(container);
+      }
+    }
+  }
+
+  componentWillUnmount() {
+    this.resizeObserver?.disconnect();
   }
 
   public render = (): ReactElement => {
@@ -1239,12 +1512,15 @@ class DiffViewer extends React.Component<
       height: this.props.infiniteLoading.containerHeight
     } as const : {}
 
-    const totalContentHeight = nodes.totalRenderedRows * DiffViewer.ESTIMATED_ROW_HEIGHT;
+    // Only apply noWrap when infiniteLoading is enabled but we don't have cumulative offsets yet
+    // Once offsets are calculated, we enable pre-wrap for proper text wrapping
+    const shouldNoWrap = !!this.props.infiniteLoading && !this.state.cumulativeOffsets;
 
     const tableElement = (
       <table
         className={cn(this.styles.diffContainer, {
           [this.styles.splitView]: splitView,
+          [this.styles.noWrap]: shouldNoWrap,
         })}
         onMouseUp={() => {
           const elements = document.getElementsByClassName("right");
@@ -1287,18 +1563,21 @@ class DiffViewer extends React.Component<
         ref={this.state.scrollableContainerRef}
       >
         {(!this.props.hideSummary || leftTitle || rightTitle) && (
-          <div className={this.styles.stickyHeader}>
+          <div ref={this.stickyHeaderRef} className={this.styles.stickyHeader}>
             {!this.props.hideSummary && (
               <div className={this.styles.summary} role={"banner"}>
                 <button
                   type={"button"}
                   className={this.styles.allExpandButton}
                   onClick={() => {
-                    this.setState({
-                      expandedBlocks: allExpanded
-                        ? []
-                        : nodes.blocks.map((b) => b.index),
-                    });
+                    this.setState(
+                      {
+                        expandedBlocks: allExpanded
+                          ? []
+                          : nodes.blocks.map((b) => b.index),
+                      },
+                      () => this.recalculateOffsets()
+                    );
                   }}
                 >
                   {allExpanded ? <Fold /> : <Expand />}
@@ -1328,11 +1607,85 @@ class DiffViewer extends React.Component<
         )}
         {this.state.isLoading && LoadingElement && <LoadingElement />}
         {this.props.infiniteLoading ? (
-          <div style={{ minHeight: totalContentHeight, paddingTop: nodes.topPadding }}>
+          <div style={{
+            paddingTop: nodes.topPadding,
+            paddingBottom: nodes.bottomPadding,
+          }}>
             {tableElement}
           </div>
         ) : (
           tableElement
+        )}
+        {/* Hidden element for measuring character width */}
+        <span
+          ref={this.charMeasureRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: '-9999px',
+            visibility: 'hidden',
+            whiteSpace: 'pre',
+            fontFamily: 'monospace',
+            fontSize: 12,
+          }}
+          aria-hidden="true"
+        >M</span>
+        {/* Debug overlay */}
+        {this.props.infiniteLoading && this.props.showDebugInfo && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 10,
+              right: 10,
+              background: 'rgba(0,0,0,0.85)',
+              color: '#0f0',
+              padding: '10px',
+              fontFamily: 'monospace',
+              fontSize: '11px',
+              zIndex: 9999,
+              borderRadius: '4px',
+              maxWidth: '300px',
+              lineHeight: 1.4,
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: '5px', color: '#fff' }}>Debug Info</div>
+            <div>scrollTop: {nodes.debug.scrollTop}</div>
+            <div>headerHeight: {nodes.debug.headerHeight}</div>
+            <div>contentScrollTop: {nodes.debug.contentScrollTop}</div>
+            <div>clientHeight: {nodes.debug.clientHeight}</div>
+            <div style={{ marginTop: '5px', borderTop: '1px solid #444', paddingTop: '5px' }}>
+              <div>visibleRowStart: {nodes.debug.visibleRowStart}</div>
+              <div>visibleRowEnd: {nodes.debug.visibleRowEnd}</div>
+            </div>
+            <div style={{ marginTop: '5px', borderTop: '1px solid #444', paddingTop: '5px' }}>
+              <div>totalRows: {nodes.debug.totalRows}</div>
+              <div>offsetsLength: {nodes.debug.offsetsLength}</div>
+              <div>renderedCount: {nodes.debug.renderedCount}</div>
+            </div>
+            <div style={{ marginTop: '5px', borderTop: '1px solid #444', paddingTop: '5px' }}>
+              <div>topPadding: {nodes.topPadding.toFixed(0)}</div>
+              <div>bottomPadding: {nodes.bottomPadding.toFixed(0)}</div>
+              <div>totalContentHeight: {nodes.totalContentHeight.toFixed(0)}</div>
+            </div>
+            <div style={{ marginTop: '5px', borderTop: '1px solid #444', paddingTop: '5px', color: '#ff0' }}>
+              <div>cumulativeOffsets: {this.state.cumulativeOffsets ? 'SET' : 'NULL'}</div>
+              <div>columnWidth: {this.state.contentColumnWidth?.toFixed(0) ?? 'N/A'}px</div>
+              <div>charWidth: {this.state.charWidth?.toFixed(2) ?? 'N/A'}px</div>
+              <div>charsPerRow: {this.state.contentColumnWidth && this.state.charWidth ? Math.floor(this.state.contentColumnWidth / this.state.charWidth) : 'N/A'}</div>
+            </div>
+            {this.state.cumulativeOffsets && (
+              <div style={{ marginTop: '5px', borderTop: '1px solid #444', paddingTop: '5px', color: '#0ff', fontSize: '10px' }}>
+                <div>offsets[{nodes.debug.visibleRowEnd}]: {this.state.cumulativeOffsets[nodes.debug.visibleRowEnd]?.toFixed(0) ?? 'N/A'}</div>
+                <div>offsets[{nodes.debug.totalRows - 1}]: {this.state.cumulativeOffsets[nodes.debug.totalRows - 1]?.toFixed(0) ?? 'N/A'}</div>
+                <div>offsets[{nodes.debug.totalRows}]: {this.state.cumulativeOffsets[nodes.debug.totalRows]?.toFixed(0) ?? 'N/A'}</div>
+                <div style={{ marginTop: '3px' }}>viewportEnd: {(nodes.debug.contentScrollTop + nodes.debug.clientHeight).toFixed(0)}</div>
+                <div style={{ marginTop: '3px', color: '#f0f' }}>
+                  scrollHeight: {this.state.scrollableContainerRef.current?.scrollHeight ?? 'N/A'}
+                </div>
+                <div>maxScrollTop: {(this.state.scrollableContainerRef.current?.scrollHeight ?? 0) - nodes.debug.clientHeight}</div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
