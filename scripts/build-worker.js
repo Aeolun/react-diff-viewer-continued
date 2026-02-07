@@ -13,10 +13,24 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.join(__dirname, '..', 'src');
 
+// Plugin to stub out workerBundle import - the worker doesn't need it
+// (it's only used by the main thread to load the worker)
+const stubWorkerBundlePlugin = {
+  name: 'stub-worker-bundle',
+  setup(build) {
+    build.onResolve({ filter: /\.\/workerBundle$/ }, () => ({
+      path: 'workerBundle-stub',
+      namespace: 'stub',
+    }));
+    build.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
+      contents: 'export const WORKER_CODE = "";',
+      loader: 'ts',
+    }));
+  },
+};
+
 async function buildWorker() {
   // Bundle the worker with all dependencies
-  // Mark workerBundle as external to avoid circular dependency -
-  // compute-lines.ts imports workerBundle.ts, but the worker doesn't need it
   const result = await esbuild.build({
     entryPoints: [path.join(srcDir, 'computeWorker.ts')],
     bundle: true,
@@ -24,7 +38,7 @@ async function buildWorker() {
     minify: true,
     write: false,
     target: 'es2020',
-    external: ['./workerBundle'],
+    plugins: [stubWorkerBundlePlugin],
   });
 
   const workerCode = result.outputFiles[0].text;
