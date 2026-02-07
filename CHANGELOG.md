@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.1 (2026-02-07)
+
+### Bug Fixes
+
+- fix problem with missing worker in compiled version
+
 ## 4.1.0 (2026-02-04)
 
 ### Features
