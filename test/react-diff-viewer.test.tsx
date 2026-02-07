@@ -93,4 +93,50 @@ describe("Testing react diff viewer", (): void => {
     // Should complete in under 2 seconds - the optimization skips word diff for long lines
     expect(duration).toBeLessThan(2000);
   });
+
+  it("Should render JSON diff with keys preserved", async (): Promise<void> => {
+    const oldObj = {
+      data: {
+        key1: "value1",
+        key2: "value2"
+      }
+    };
+
+    const newObj = {
+      data: {
+        newkey: "newvalue",
+        key1: "value2",
+        key2: "value2"
+      }
+    };
+
+    const node = render(
+      <DiffViewer
+        oldValue={oldObj}
+        newValue={newObj}
+        compareMethod={DiffMethod.JSON}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(node.container.querySelector("table")).toBeTruthy();
+    });
+
+    // Get all the rendered content
+    const allContent = node.container.textContent || '';
+    console.log("=== Rendered JSON Diff Content ===");
+    console.log(allContent);
+
+    // Check that we don't have orphan values without keys
+    // The content should NOT have "value2" appearing without "key1:" before it
+    const lines = allContent.split('\n').filter(l => l.trim());
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // Check for orphan values - a line that's just "value2" or "value2," without a key
+      if (trimmed.match(/^"value\d+"[,]?$/)) {
+        console.error(`ORPHAN VALUE IN RENDERED OUTPUT: ${trimmed}`);
+        expect(trimmed).not.toMatch(/^"value\d+"[,]?$/);
+      }
+    }
+  });
 });

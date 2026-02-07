@@ -619,11 +619,6 @@ class DiffViewer extends React.Component<
     renderer?: (chunk: string) => JSX.Element,
   ): ReactElement[] => {
     const showHighlight = this.shouldHighlightWordDiff();
-    const { compareMethod } = this.props;
-    // Don't apply syntax highlighting for JSON/YAML - their word diffs are computed
-    // on-demand from raw strings and syntax highlighting creates messy fragmented tokens.
-    const skipSyntaxHighlighting =
-      compareMethod === DiffMethod.JSON || compareMethod === DiffMethod.YAML;
 
     // Reconstruct the full line from diff chunks
     const fullLine = diffArray
@@ -637,9 +632,9 @@ class DiffViewer extends React.Component<
       return [<span key="long-line">{fullLine}</span>];
     }
 
-    // If we have a renderer and syntax highlighting is enabled, try to highlight
-    // the full line first, then apply diff styling to preserve proper tokenization.
-    if (renderer && !skipSyntaxHighlighting) {
+    // If we have a renderer, try to highlight the full line first,
+    // then apply diff styling to preserve proper tokenization.
+    if (renderer) {
       // Get the syntax-highlighted content
       const highlighted = renderer(fullLine);
 
@@ -1394,6 +1389,13 @@ class DiffViewer extends React.Component<
     ) {
       // Clear word diff cache when diff changes
       this.wordDiffCache.clear();
+
+      // Reset scroll position to top
+      const container = this.state.scrollableContainerRef.current;
+      if (container) {
+        container.scrollTop = 0;
+      }
+
       this.setState((prev) => ({
         ...prev,
         isLoading: true,
@@ -1608,10 +1610,17 @@ class DiffViewer extends React.Component<
         {this.state.isLoading && LoadingElement && <LoadingElement />}
         {this.props.infiniteLoading ? (
           <div style={{
-            paddingTop: nodes.topPadding,
-            paddingBottom: nodes.bottomPadding,
+            height: nodes.totalContentHeight,
+            position: 'relative',
           }}>
-            {tableElement}
+            <div style={{
+              position: 'absolute',
+              top: nodes.topPadding,
+              left: 0,
+              right: 0,
+            }}>
+              {tableElement}
+            </div>
           </div>
         ) : (
           tableElement

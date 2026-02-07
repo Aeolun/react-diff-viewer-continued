@@ -207,9 +207,19 @@ function diffObjects(
         const keyPrefix = innerIndent + JSON.stringify(key) + ': ';
         const valueDiff = diffStructurally(oldObj[key], newObj[key], indent + 1, format);
 
-        // Prepend key to first change so they're on the same line
+        // Prepend key to the appropriate changes
         if (valueDiff.length > 0) {
-          valueDiff[0].value = keyPrefix + valueDiff[0].value;
+          if (!valueDiff[0].removed && !valueDiff[0].added) {
+            // First change is neutral (e.g., opening brace of nested object) - prepend key to it only
+            valueDiff[0].value = keyPrefix + valueDiff[0].value;
+          } else {
+            // First change is removed or added - this is a primitive value change
+            // Both the removed (old) and added (new) lines need the key
+            const firstRemoved = valueDiff.find(c => c.removed);
+            const firstAdded = valueDiff.find(c => c.added);
+            if (firstRemoved) firstRemoved.value = keyPrefix + firstRemoved.value;
+            if (firstAdded) firstAdded.value = keyPrefix + firstAdded.value;
+          }
         }
 
         // Add comma to last change if needed
