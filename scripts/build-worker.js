@@ -18,7 +18,7 @@ const srcDir = path.join(__dirname, '..', 'src');
 const stubWorkerBundlePlugin = {
   name: 'stub-worker-bundle',
   setup(build) {
-    build.onResolve({ filter: /\.\/workerBundle$/ }, () => ({
+    build.onResolve({ filter: /\.\/workerBundle(\.js)?$/ }, () => ({
       path: 'workerBundle-stub',
       namespace: 'stub',
     }));

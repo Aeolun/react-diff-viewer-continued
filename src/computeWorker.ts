@@ -1,4 +1,4 @@
-import { computeLineInformation } from "./compute-lines";
+import { computeLineInformation } from "./compute-lines.js";
 
 /**
  * This sets up a message handler inside the Web Worker.

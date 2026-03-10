@@ -1,5 +1,5 @@
 import { ReactElement } from "react";
-import { DiffType, type LineInformation } from "./compute-lines";
+import { DiffType, type LineInformation } from "./compute-lines.js";
 
 export interface Block {
   index: number;
