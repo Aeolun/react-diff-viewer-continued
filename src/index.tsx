@@ -1703,4 +1703,5 @@ class DiffViewer extends React.Component<
 
 export default DiffViewer;
 export { DiffMethod };
-export type { ReactDiffViewerStylesOverride };
+export { default as computeStyles } from "./styles.js";
+export type { ReactDiffViewerStylesOverride, ReactDiffViewerStyles };
