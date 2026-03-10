@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.2.0 (2026-03-10)
+
+### Features
+
+- export computeStyles and add missing style override properties
+
+### Bug Fixes
+
+- add .js extensions to relative imports for Node.js ESM compatibility
+
 ## 4.1.3 (2026-02-07)
 
 ### Bug Fixes
