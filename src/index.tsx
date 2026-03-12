@@ -814,12 +814,19 @@ class DiffViewer extends React.Component<
             right: prefix === LineNumberPrefix.RIGHT,
           })}
           onMouseDown={() => {
-            const elements = document.getElementsByClassName(
+            const rightElements = document.getElementsByClassName("right");
+            for (let i = 0; i < rightElements.length; i++) {
+              rightElements.item(i).classList.remove(this.styles.noSelect);
+            }
+            const leftElements = document.getElementsByClassName("left");
+            for (let i = 0; i < leftElements.length; i++) {
+              leftElements.item(i).classList.remove(this.styles.noSelect);
+            }
+            const opposite = document.getElementsByClassName(
               prefix === LineNumberPrefix.LEFT ? "right" : "left",
             );
-            for (let i = 0; i < elements.length; i++) {
-              const element = elements.item(i);
-              element.classList.add(this.styles.noSelect);
+            for (let i = 0; i < opposite.length; i++) {
+              opposite.item(i).classList.add(this.styles.noSelect);
             }
           }}
           title={
@@ -1524,18 +1531,7 @@ class DiffViewer extends React.Component<
           [this.styles.splitView]: splitView,
           [this.styles.noWrap]: shouldNoWrap,
         })}
-        onMouseUp={() => {
-          const elements = document.getElementsByClassName("right");
-          for (let i = 0; i < elements.length; i++) {
-            const element = elements.item(i);
-            element.classList.remove(this.styles.noSelect);
-          }
-          const elementsLeft = document.getElementsByClassName("left");
-          for (let i = 0; i < elementsLeft.length; i++) {
-            const element = elementsLeft.item(i);
-            element.classList.remove(this.styles.noSelect);
-          }
-        }}
+        onMouseUp={() => {}}
       >
         <colgroup>
           {!this.props.hideLineNumbers && <col width={"50px"} />}
