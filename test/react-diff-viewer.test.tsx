@@ -93,6 +93,62 @@ describe("Testing react diff viewer", (): void => {
     expect(duration).toBeLessThan(2000);
   });
 
+  it("Should not render 'undefined' when renderContent returns HTML with &#x27; entities", async (): Promise<void> => {
+    // Simulates highlight.js output which encodes apostrophes as &#x27;
+    // This was the root cause of the "undefinedundefined..." suffix bug
+    const oldValue = "const x = 'hello'";
+    const newValue = "const x = 'world'";
+
+    // Simulate a syntax highlighter (like highlight.js) that encodes
+    // apostrophes as &#x27; instead of &#39;
+    const renderContent = (str: string): React.ReactElement => {
+      const html = str.replace(/'/g, "&#x27;");
+      return <span dangerouslySetInnerHTML={{ __html: html }} />;
+    };
+
+    const node = render(
+      <DiffViewer
+        oldValue={oldValue}
+        newValue={newValue}
+        compareMethod={DiffMethod.WORDS_WITH_SPACE}
+        renderContent={renderContent}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(node.container.querySelector("table")).toBeTruthy();
+    });
+
+    const allContent = node.container.textContent || "";
+    expect(allContent).not.toContain("undefined");
+  });
+
+  it("Should not render 'undefined' with multiple apostrophes in renderContent HTML", async (): Promise<void> => {
+    const oldValue = "it's a 'test' isn't it";
+    const newValue = "it's a 'change' isn't it";
+
+    const renderContent = (str: string): React.ReactElement => {
+      const html = str.replace(/'/g, "&#x27;");
+      return <span dangerouslySetInnerHTML={{ __html: html }} />;
+    };
+
+    const node = render(
+      <DiffViewer
+        oldValue={oldValue}
+        newValue={newValue}
+        compareMethod={DiffMethod.WORDS_WITH_SPACE}
+        renderContent={renderContent}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(node.container.querySelector("table")).toBeTruthy();
+    });
+
+    const allContent = node.container.textContent || "";
+    expect(allContent).not.toContain("undefined");
+  });
+
   it("Should render JSON diff with keys preserved", async (): Promise<void> => {
     const oldObj = {
       data: {
