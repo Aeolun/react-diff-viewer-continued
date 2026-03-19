@@ -84,6 +84,7 @@ function applyDiffToHighlightedHtml(
       .replace(/&amp;/g, "&")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
+      .replace(/&#x27;/g, "'")
       .replace(/&nbsp;/g, "\u00A0");
   }
 
