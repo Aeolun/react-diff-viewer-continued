@@ -17,7 +17,7 @@ import newJson from './diff/json/new.json';
 
 interface ExampleState {
   splitView?: boolean;
-  highlightLine?: string[];
+  highlightLine: string[];
   language?: string;
   lineNumbers: boolean;
   theme: 'dark' | 'light';
@@ -60,7 +60,7 @@ class Example extends Component<{}, ExampleState> {
   ): void => {
     let highlightLine = [id];
     if (e.shiftKey && this.state.highlightLine.length === 1) {
-      const [dir, oldId] = this.state.highlightLine[0].split('-');
+      const [dir, oldId] = this.state.highlightLine[0]!.split('-');
       const [newDir, newId] = id.split('-');
       if (dir === newDir) {
         highlightLine = [];
@@ -390,12 +390,12 @@ class Example extends Component<{}, ExampleState> {
             summary={this.state.compareMethod === DiffMethod.JSON ? 'package.json' : 'webpack.config.js'}
             leftTitle={this.state.columnHeaders ? `master@2178133 - pushed 2 hours ago.` : undefined}
             rightTitle={this.state.columnHeaders ? `master@64207ee - pushed 13 hours ago.` : undefined}
-            infiniteLoading={this.state.infiniteLoading && {
+            infiniteLoading={this.state.infiniteLoading ? {
               pageSize: 20,
               containerHeight: '70vh'
-            }}
+            } : undefined}
             disableWorker={this.state.disableWorker}
-            loadingElement={this.state.loadingElement && (() => (
+            loadingElement={this.state.loadingElement ? (() => (
               <div style={{
                 width: '100%',
                 height: '100%',
@@ -403,11 +403,11 @@ class Example extends Component<{}, ExampleState> {
                 zIndex: '1',
                 background: '#00000061'
               }}>
-                <p style={{ position: 'absolute', top: '50%', right: '50%', transform: 'translate(50%,-50%)' }}>
-                  Loading Content...
+                <p style={{ position: 'absolute', top: '50%', right: '50%', transform: 'translate(50%,-50%)', color: '#fff', fontSize: '16px', fontWeight: 'bold' }}>
+                  Loading diff...
                 </p>
               </div>
-            ))}
+            )) : undefined}
           />
         </div>
         <footer>
@@ -425,5 +425,5 @@ class Example extends Component<{}, ExampleState> {
   }
 }
 
-const root = createRoot(document.getElementById('app'));
+const root = createRoot(document.getElementById('app')!);
 root.render(<Example />);

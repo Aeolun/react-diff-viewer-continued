@@ -15,7 +15,8 @@
       "Bash(pnpm run build:*)",
       "Bash(pnpm exec vitest:*)",
       "Bash(grep:*)",
-      "Bash(pnpm run test:*)"
+      "Bash(pnpm run test:*)",
+      "Bash(npm run *)"
     ],
     "deny": [],
     "ask": []

@@ -10,7 +10,6 @@ export enum DiffType {
   CHANGED = 3,
 }
 
-// Local interface for Change objects - more flexible than diff.Change which requires all properties
 interface Change {
   value: string;
   added?: boolean;
@@ -351,13 +350,12 @@ export interface DiffInformation {
   value?: string | DiffInformation[];
   lineNumber?: number;
   type?: DiffType;
-  // For deferred word diff computation - stores raw strings
   rawValue?: string;
 }
 
 export interface LineInformation {
-  left?: DiffInformation;
-  right?: DiffInformation;
+  left: DiffInformation;
+  right: DiffInformation;
 }
 
 export interface ComputedLineInformation {
@@ -375,7 +373,7 @@ export interface ComputedDiffInformation {
 export interface JsDiffChangeObject {
   added?: boolean;
   removed?: boolean;
-  value?: string;
+  value: string;
 }
 
 /**
@@ -414,25 +412,16 @@ const computeDiff = (
     left: [],
     right: [],
   };
-  diffArray.forEach(({ added, removed, value }): DiffInformation => {
-    const diffInformation: DiffInformation = {};
+  diffArray.forEach(({ added, removed, value }): void => {
     if (added) {
-      diffInformation.type = DiffType.ADDED;
-      diffInformation.value = value;
-      computedDiff.right.push(diffInformation);
+      computedDiff.right!.push({ type: DiffType.ADDED, value });
+    } else if (removed) {
+      computedDiff.left!.push({ type: DiffType.REMOVED, value });
+    } else {
+      const info: DiffInformation = { type: DiffType.DEFAULT, value };
+      computedDiff.right!.push(info);
+      computedDiff.left!.push(info);
     }
-    if (removed) {
-      diffInformation.type = DiffType.REMOVED;
-      diffInformation.value = value;
-      computedDiff.left.push(diffInformation);
-    }
-    if (!removed && !added) {
-      diffInformation.type = DiffType.DEFAULT;
-      diffInformation.value = value;
-      computedDiff.right.push(diffInformation);
-      computedDiff.left.push(diffInformation);
-    }
-    return diffInformation;
   });
   return computedDiff;
 };
@@ -508,7 +497,7 @@ const computeLineInformation = (
     const lines = constructLines(value);
 
     return lines
-      .map((line: string, lineIndex): LineInformation => {
+      .map((line: string, lineIndex): LineInformation | undefined => {
         const left: DiffInformation = {};
         const right: DiffInformation = {};
         if (
@@ -623,10 +612,10 @@ const computeLineInformation = (
         }
         return { right, left };
       })
-      .filter(Boolean);
+      .filter((x): x is LineInformation => x != null);
   };
 
-  diffArray.forEach(({ added, removed, value }: diff.Change, index): void => {
+  diffArray.forEach(({ added, removed, value }: Change, index): void => {
     lineInformation = [
       ...lineInformation,
       ...getLineInformation(value, index, added, removed),

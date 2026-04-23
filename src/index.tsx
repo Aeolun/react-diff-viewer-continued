@@ -44,7 +44,7 @@ function applyDiffToHighlightedHtml(
   for (const diff of diffArray) {
     const value = typeof diff.value === "string" ? diff.value : "";
     if (value.length > 0) {
-      ranges.push({ start: pos, end: pos + value.length, type: diff.type });
+      ranges.push({ start: pos, end: pos + value.length, type: diff.type ?? DiffType.DEFAULT });
       pos += value.length;
     }
   }
@@ -250,8 +250,8 @@ export interface ReactDiffViewerProps {
     type: DiffType;
     prefix: LineNumberPrefix;
     value: string | DiffInformation[];
-    additionalLineNumber: number;
-    additionalPrefix: LineNumberPrefix;
+    additionalLineNumber?: number;
+    additionalPrefix?: LineNumberPrefix;
     styles: ReactDiffViewerStyles;
   }) => ReactElement;
   // Array of line ids to highlight lines.
@@ -294,10 +294,9 @@ export interface ReactDiffViewerProps {
 }
 
 export interface ReactDiffViewerState {
-  // Array holding the expanded code folding.
-  expandedBlocks?: number[];
+  expandedBlocks: number[];
   noSelect?: "left" | "right";
-  scrollableContainerRef: RefObject<HTMLDivElement>
+  scrollableContainerRef: RefObject<HTMLDivElement | null>
   computedDiffResult: Record<string, ComputedDiffResult>
   isLoading: boolean
   // For virtualization: the first visible row index
@@ -313,7 +312,7 @@ class DiffViewer extends React.Component<
   ReactDiffViewerProps,
   ReactDiffViewerState
 > {
-  private styles: ReactDiffViewerStyles;
+  private styles!: ReactDiffViewerStyles;
 
   // Cache for on-demand word diff computation
   private wordDiffCache: Map<string, { left: DiffInformation[]; right: DiffInformation[] }> = new Map();
@@ -367,31 +366,24 @@ class DiffViewer extends React.Component<
     left: DiffInformation,
     right: DiffInformation,
     lineIndex: number
-  ): { leftValue: string | DiffInformation[]; rightValue: string | DiffInformation[] } => {
-    // Handle empty left/right
+  ): { leftValue: string | DiffInformation[] | undefined; rightValue: string | DiffInformation[] | undefined } => {
     if (!left || !right) {
       return { leftValue: left?.value, rightValue: right?.value };
     }
 
-    // If no raw values, word diff was already computed or disabled
-    // Use explicit undefined check since empty string is a valid raw value
     if (left.rawValue === undefined || right.rawValue === undefined) {
       return { leftValue: left.value, rightValue: right.value };
     }
 
-    // Check cache
     const cacheKey = `${lineIndex}-${left.rawValue}-${right.rawValue}`;
     let cached = this.wordDiffCache.get(cacheKey);
 
     if (!cached) {
-      // Compute word diff on-demand
-      // Use CHARS method for on-demand computation since rawValue is always a string
-      // (JSON/YAML methods only work with objects, not the string lines we have here)
       const compareMethod = (this.props.compareMethod === DiffMethod.JSON || this.props.compareMethod === DiffMethod.YAML)
         ? DiffMethod.CHARS
         : this.props.compareMethod;
       const computed = computeDiff(left.rawValue, right.rawValue, compareMethod);
-      cached = { left: computed.left, right: computed.right };
+      cached = { left: computed.left ?? [], right: computed.right ?? [] };
       this.wordDiffCache.set(cacheKey, cached);
     }
 
@@ -566,10 +558,10 @@ class DiffViewer extends React.Component<
       lineBlocks,
       blocks,
       this.state.expandedBlocks,
-      this.props.showDiffOnly,
+      this.props.showDiffOnly ?? true,
       charWidth,
       columnWidth,
-      this.props.splitView,
+      this.props.splitView ?? true,
     );
 
     this.setState({ cumulativeOffsets: offsets, contentColumnWidth: columnWidth, charWidth }, () => {
@@ -598,7 +590,7 @@ class DiffViewer extends React.Component<
    */
   private onLineNumberClickProxy = (id: string): any => {
     if (this.props.onLineNumberClick) {
-      return (e: any): void => this.props.onLineNumberClick(id, e);
+      return (e: any): void => this.props.onLineNumberClick!(id, e);
     }
     return (): void => {};
   };
@@ -673,11 +665,10 @@ class DiffViewer extends React.Component<
 
     // Fallback: render each chunk separately (used for JSON/YAML or non-HTML renderers)
     return diffArray.map((wordDiff, i): JSX.Element => {
-      let content: string | JSX.Element;
+      let content: string | JSX.Element | undefined;
       if (typeof wordDiff.value === "string") {
         content = wordDiff.value;
       } else {
-        // If wordDiff.value is DiffInformation[], we don't handle it. See c0c99f5712.
         content = undefined;
       }
 
@@ -721,18 +712,19 @@ class DiffViewer extends React.Component<
    * @param additionalPrefix Similar to prefix but for additional line number.
    */
   private renderLine = (
-    lineNumber: number,
-    type: DiffType,
+    lineNumber: number | null | undefined,
+    type: DiffType | undefined,
     prefix: LineNumberPrefix,
-    value: string | DiffInformation[],
-    additionalLineNumber?: number,
+    value: string | DiffInformation[] | undefined,
+    additionalLineNumber?: number | null,
     additionalPrefix?: LineNumberPrefix,
   ): ReactElement => {
     const lineNumberTemplate = `${prefix}-${lineNumber}`;
     const additionalLineNumberTemplate = `${additionalPrefix}-${additionalLineNumber}`;
+    const highlightLines = this.props.highlightLines ?? [];
     const highlightLine =
-      this.props.highlightLines.includes(lineNumberTemplate) ||
-      this.props.highlightLines.includes(additionalLineNumberTemplate);
+      highlightLines.includes(lineNumberTemplate) ||
+      highlightLines.includes(additionalLineNumberTemplate);
     const added = type === DiffType.ADDED;
     const removed = type === DiffType.REMOVED;
     const changed = type === DiffType.CHANGED;
@@ -740,7 +732,7 @@ class DiffViewer extends React.Component<
     const hasWordDiff = Array.isArray(value);
     if (hasWordDiff) {
       content = this.renderWordDiff(value, this.props.renderContent);
-    } else if (this.props.renderContent) {
+    } else if (this.props.renderContent && typeof value === "string") {
       content = this.props.renderContent(value);
     } else {
       content = value;
@@ -790,11 +782,11 @@ class DiffViewer extends React.Component<
         )}
         {this.props.renderGutter
           ? this.props.renderGutter({
-              lineNumber,
-              type,
+              lineNumber: lineNumber ?? 0,
+              type: type ?? DiffType.DEFAULT,
               prefix,
-              value,
-              additionalLineNumber,
+              value: value ?? "",
+              additionalLineNumber: additionalLineNumber ?? undefined,
               additionalPrefix,
               styles: this.styles,
             })
@@ -827,17 +819,17 @@ class DiffViewer extends React.Component<
           onMouseDown={() => {
             const rightElements = document.getElementsByClassName("right");
             for (let i = 0; i < rightElements.length; i++) {
-              rightElements.item(i).classList.remove(this.styles.noSelect);
+              rightElements[i]?.classList.remove(this.styles.noSelect);
             }
             const leftElements = document.getElementsByClassName("left");
             for (let i = 0; i < leftElements.length; i++) {
-              leftElements.item(i).classList.remove(this.styles.noSelect);
+              leftElements[i]?.classList.remove(this.styles.noSelect);
             }
             const opposite = document.getElementsByClassName(
               prefix === LineNumberPrefix.LEFT ? "right" : "left",
             );
             for (let i = 0; i < opposite.length; i++) {
-              opposite.item(i).classList.add(this.styles.noSelect);
+              opposite[i]?.classList.add(this.styles.noSelect);
             }
           }}
           title={
@@ -1139,10 +1131,8 @@ class DiffViewer extends React.Component<
       this.props.disableWorker,
     );
 
-    const extraLines =
-      this.props.extraLinesSurroundingDiff < 0
-        ? 0
-        : Math.round(this.props.extraLinesSurroundingDiff);
+    const rawExtraLines = this.props.extraLinesSurroundingDiff ?? 3;
+    const extraLines = rawExtraLines < 0 ? 0 : Math.round(rawExtraLines);
 
     const { lineBlocks, blocks } = computeHiddenBlocks(
       lineInformation,
@@ -1363,8 +1353,8 @@ class DiffViewer extends React.Component<
                 {this.renderSkippedLineIndicator(
                   blocks[blockIndex].lines,
                   blockIndex,
-                  line.left.lineNumber,
-                  line.right.lineNumber,
+                  line.left.lineNumber ?? 0,
+                  line.right.lineNumber ?? 0,
                 )}
               </React.Fragment>
             );
@@ -1495,7 +1485,7 @@ class DiffViewer extends React.Component<
       }
     }
 
-    this.styles = this.computeStyles(this.props.styles, useDarkTheme, nonce);
+    this.styles = this.computeStyles(this.props.styles ?? {}, useDarkTheme ?? false, nonce ?? "");
     const nodes = this.renderDiff();
 
     let colSpanOnSplitView = 3;
@@ -1591,7 +1581,22 @@ class DiffViewer extends React.Component<
       </table>
     );
 
+    const showLoadingOverlay = (this.state.isLoading || this.state.isScrolling) && !!LoadingElement;
+
     return (
+      <div style={{ position: 'relative' }}>
+      {showLoadingOverlay && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 3,
+        }}>
+          <LoadingElement />
+        </div>
+      )}
       <div
         style={{ ...scrollDivStyle, position: 'relative' }}
         onScroll={this.onScroll}
@@ -1640,7 +1645,6 @@ class DiffViewer extends React.Component<
             )}
           </div>
         )}
-        {this.state.isLoading && LoadingElement && <LoadingElement />}
         {this.props.infiniteLoading ? (
           <div style={{
             height: nodes.totalContentHeight,
@@ -1730,6 +1734,7 @@ class DiffViewer extends React.Component<
             )}
           </div>
         )}
+      </div>
       </div>
     );
   };

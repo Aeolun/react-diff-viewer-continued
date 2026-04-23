@@ -31,8 +31,8 @@ jobs:
       - name: Install dependencies
         run: pnpm i
 
-      - name: Build worker bundle
-        run: pnpm run build:worker
+      - name: Build
+        run: pnpm run build
 
       - name: Run unit tests
         run: pnpm run test

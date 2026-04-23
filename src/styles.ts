@@ -2,38 +2,42 @@ import createEmotion from "@emotion/css/create-instance";
 import type { Interpolation } from "@emotion/react";
 
 export interface ReactDiffViewerStyles {
-  diffContainer?: string;
-  diffRemoved?: string;
-  diffAdded?: string;
-  diffChanged?: string;
-  line?: string;
-  highlightedGutter?: string;
-  contentText?: string;
-  lineContent?: string;
-  gutter?: string;
-  highlightedLine?: string;
-  lineNumber?: string;
-  marker?: string;
-  wordDiff?: string;
-  wordAdded?: string;
-  wordRemoved?: string;
-  codeFoldGutter?: string;
-  codeFoldExpandButton?: string;
-  summary?: string;
-  codeFoldContentContainer?: string;
-  emptyGutter?: string;
-  emptyLine?: string;
-  codeFold?: string;
-  stickyHeader?: string;
-  columnHeaders?: string;
-  titleBlock?: string;
-  content?: string;
-  column?: string;
-  noSelect?: string;
-  noWrap?: string;
-  splitView?: string;
-  allExpandButton?: string;
-  [key: string]: string | undefined;
+  diffContainer: string;
+  diffRemoved: string;
+  diffAdded: string;
+  diffChanged: string;
+  line: string;
+  highlightedGutter: string;
+  contentText: string;
+  lineContent: string;
+  gutter: string;
+  highlightedLine: string;
+  lineNumber: string;
+  marker: string;
+  wordDiff: string;
+  wordAdded: string;
+  wordRemoved: string;
+  codeFoldGutter: string;
+  codeFoldExpandButton: string;
+  summary: string;
+  codeFoldContentContainer: string;
+  emptyGutter: string;
+  emptyLine: string;
+  codeFold: string;
+  codeFoldContent: string;
+  stickyHeader: string;
+  columnHeaders: string;
+  titleBlock: string;
+  content: string;
+  column: string;
+  noSelect: string;
+  noWrap: string;
+  splitView: string;
+  allExpandButton: string;
+  block: string;
+  blockAddition: string;
+  blockDeletion: string;
+  [key: string]: string;
 }
 
 export interface ReactDiffViewerStylesVariables {
@@ -546,27 +550,23 @@ export default (
     allExpandButton,
   };
 
-  const computerOverrideStyles: ReactDiffViewerStyles = Object.keys(
+  const computerOverrideStyles: Record<string, string> = Object.keys(
     styles,
   ).reduce(
-    (acc, key): ReactDiffViewerStyles => ({
+    (acc, key) => ({
       ...acc,
-      ...{
-        [key]: css((styles as any)[key]),
-      },
+      [key]: css((styles as any)[key]),
     }),
-    {},
+    {} as Record<string, string>,
   );
 
   return Object.keys(defaultStyles).reduce(
-    (acc, key): ReactDiffViewerStyles => ({
+    (acc, key) => ({
       ...acc,
-      ...{
-        [key]: computerOverrideStyles[key]
-          ? cx(defaultStyles[key], computerOverrideStyles[key])
-          : defaultStyles[key],
-      },
+      [key]: computerOverrideStyles[key]
+        ? cx(defaultStyles[key], computerOverrideStyles[key])
+        : defaultStyles[key],
     }),
-    {},
+    {} as ReactDiffViewerStyles,
   );
 };
