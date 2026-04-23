@@ -28,7 +28,8 @@ interface ExampleState {
   dataType: string;
   customGutter?: boolean;
   infiniteLoading?: boolean;
-  loadingElement?: boolean
+  loadingElement?: boolean;
+  disableWorker?: boolean;
 }
 
 const P = (window as any).Prism;
@@ -48,7 +49,8 @@ class Example extends Component<{}, ExampleState> {
       dataType: 'javascript',
       compareMethod: DiffMethod.CHARS,
       infiniteLoading: true,
-      loadingElement: true
+      loadingElement: true,
+      disableWorker: false,
     };
   }
 
@@ -268,6 +270,21 @@ class Example extends Component<{}, ExampleState> {
               <span>Show Loading Text</span>
             </div>
             <div>
+              <label className={'switch'}>
+                <input
+                  type="checkbox"
+                  checked={this.state.disableWorker}
+                  onChange={() => {
+                    this.setState({
+                      disableWorker: !this.state.disableWorker,
+                    });
+                  }}
+                />
+                <span className="slider round"></span>
+              </label>
+              <span>Disable Worker</span>
+            </div>
+            <div>
               <label className={'select'}>
                 <select
                   value={this.state.dataType}
@@ -377,6 +394,7 @@ class Example extends Component<{}, ExampleState> {
               pageSize: 20,
               containerHeight: '70vh'
             }}
+            disableWorker={this.state.disableWorker}
             loadingElement={this.state.loadingElement && (() => (
               <div style={{
                 width: '100%',

@@ -286,6 +286,11 @@ export interface ReactDiffViewerProps {
    * Show debug overlay with virtualization info (for development)
    */
   showDebugInfo?: boolean
+  /**
+   * Disable Web Worker for diff computation, using synchronous fallback instead.
+   * Useful when the worker bundle fails to load in certain bundler configurations.
+   */
+  disableWorker?: boolean
 }
 
 export interface ReactDiffViewerState {
@@ -301,6 +306,7 @@ export interface ReactDiffViewerState {
   contentColumnWidth: number | null;
   charWidth: number | null;
   cumulativeOffsets: number[] | null;
+  isScrolling: boolean;
 }
 
 class DiffViewer extends React.Component<
@@ -317,6 +323,8 @@ class DiffViewer extends React.Component<
   private charMeasureRef: RefObject<HTMLSpanElement | null> = React.createRef();
   private stickyHeaderRef: RefObject<HTMLDivElement | null> = React.createRef();
   private resizeObserver: ResizeObserver | null = null;
+  private scrollDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastRenderedRange: { start: number; end: number } = { start: 0, end: Infinity };
 
   public static defaultProps: ReactDiffViewerProps = {
     oldValue: "",
@@ -347,6 +355,7 @@ class DiffViewer extends React.Component<
       contentColumnWidth: null,
       charWidth: null,
       cumulativeOffsets: null,
+      isScrolling: false,
     };
   }
 
@@ -1127,6 +1136,7 @@ class DiffViewer extends React.Component<
       linesOffset,
       this.props.alwaysShowLines,
       shouldDeferWordDiff,
+      this.props.disableWorker,
     );
 
     const extraLines =
@@ -1175,9 +1185,30 @@ class DiffViewer extends React.Component<
       ? this.findLineAtOffset(contentScrollTop, cumulativeOffsets)
       : Math.floor(contentScrollTop / DiffViewer.ESTIMATED_ROW_HEIGHT);
 
-    // Only update state if the start row changed (avoid unnecessary re-renders)
+    const viewportRows = Math.ceil(container.clientHeight / DiffViewer.ESTIMATED_ROW_HEIGHT);
+    const newEndRow = newStartRow + viewportRows;
+    const leavesRenderedRange = newStartRow < this.lastRenderedRange.start || newEndRow > this.lastRenderedRange.end;
+
+    if (this.scrollDebounceTimer) {
+      clearTimeout(this.scrollDebounceTimer);
+    }
+
+    const stateUpdate: Partial<ReactDiffViewerState> = {};
     if (newStartRow !== this.state.visibleStartRow) {
-      this.setState({ visibleStartRow: newStartRow });
+      stateUpdate.visibleStartRow = newStartRow;
+    }
+    if (leavesRenderedRange && !this.state.isScrolling) {
+      stateUpdate.isScrolling = true;
+    }
+
+    if (Object.keys(stateUpdate).length > 0) {
+      this.setState(stateUpdate as ReactDiffViewerState);
+    }
+
+    if (this.state.isScrolling || leavesRenderedRange) {
+      this.scrollDebounceTimer = setTimeout(() => {
+        this.setState({ isScrolling: false });
+      }, 150);
     }
   }
 
@@ -1362,6 +1393,8 @@ class DiffViewer extends React.Component<
       ? totalContentHeight - (cumulativeOffsets[lastRenderedRowIndex + 1] || totalContentHeight)
       : 0;
 
+    this.lastRenderedRange = { start: visibleRowStart, end: visibleRowEnd };
+
     return {
       diffNodes,
       blocks,
@@ -1371,7 +1404,6 @@ class DiffViewer extends React.Component<
       bottomPadding,
       totalContentHeight,
       renderedCount: diffNodes.length,
-      // Debug info
       debug: {
         visibleRowStart,
         visibleRowEnd,
@@ -1436,6 +1468,9 @@ class DiffViewer extends React.Component<
 
   componentWillUnmount() {
     this.resizeObserver?.disconnect();
+    if (this.scrollDebounceTimer) {
+      clearTimeout(this.scrollDebounceTimer);
+    }
   }
 
   public render = (): ReactElement => {
@@ -1616,6 +1651,7 @@ class DiffViewer extends React.Component<
               top: nodes.topPadding,
               left: 0,
               right: 0,
+              visibility: this.state.isScrolling ? 'hidden' : 'visible',
             }}>
               {tableElement}
             </div>
