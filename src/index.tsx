@@ -197,7 +197,8 @@ export enum LineNumberPrefix {
 
 export interface InfiniteLoadingProps {
   pageSize: number,
-  containerHeight: string
+  containerHeight: string,
+  overscan?: number,
 }
 
 export interface ComputedDiffResult {
@@ -1204,7 +1205,7 @@ class DiffViewer extends React.Component<
     // Calculate visible range for virtualization
     let visibleRowStart = 0;
     let visibleRowEnd = Infinity;
-    const buffer = 5; // render extra rows above/below viewport
+    const buffer = infiniteLoading?.overscan ?? 20;
 
     if (infiniteLoading && scrollableContainerRef.current) {
       const container = scrollableContainerRef.current;
