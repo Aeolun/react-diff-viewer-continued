@@ -103,36 +103,37 @@ export interface ReactDiffViewerStylesOverride {
   allExpandButton?: Interpolation;
 }
 
-export const defaultLightThemeVariables: Required<ReactDiffViewerStylesVariables> =
-  {
-    diffViewerBackground: "#fff",
-    diffViewerColor: "#212529",
-    addedBackground: "#e6ffed",
-    addedColor: "#24292e",
-    removedBackground: "#ffeef0",
-    removedColor: "#24292e",
-    changedBackground: "#fffbdd",
-    wordAddedBackground: "#acf2bd",
-    wordRemovedBackground: "#fdb8c0",
-    addedGutterBackground: "#cdffd8",
-    removedGutterBackground: "#ffdce0",
-    gutterBackground: "#f7f7f7",
-    gutterBackgroundDark: "#f3f1f1",
-    highlightBackground: "#fffbdd",
-    highlightGutterBackground: "#fff5b1",
-    codeFoldGutterBackground: "#dbedff",
-    codeFoldBackground: "#f1f8ff",
-    emptyLineBackground: "#fafbfc",
-    gutterColor: "#212529",
-    addedGutterColor: "#212529",
-    removedGutterColor: "#212529",
-    codeFoldContentColor: "#212529",
-    diffViewerTitleBackground: "#fafbfc",
-    diffViewerTitleColor: "#212529",
-    diffViewerTitleBorderColor: "#eee",
-  };
+export const defaultLightThemeVariables: Readonly<
+  Required<ReactDiffViewerStylesVariables>
+> = Object.freeze({
+  diffViewerBackground: "#fff",
+  diffViewerColor: "#212529",
+  addedBackground: "#e6ffed",
+  addedColor: "#24292e",
+  removedBackground: "#ffeef0",
+  removedColor: "#24292e",
+  changedBackground: "#fffbdd",
+  wordAddedBackground: "#acf2bd",
+  wordRemovedBackground: "#fdb8c0",
+  addedGutterBackground: "#cdffd8",
+  removedGutterBackground: "#ffdce0",
+  gutterBackground: "#f7f7f7",
+  gutterBackgroundDark: "#f3f1f1",
+  highlightBackground: "#fffbdd",
+  highlightGutterBackground: "#fff5b1",
+  codeFoldGutterBackground: "#dbedff",
+  codeFoldBackground: "#f1f8ff",
+  emptyLineBackground: "#fafbfc",
+  gutterColor: "#212529",
+  addedGutterColor: "#212529",
+  removedGutterColor: "#212529",
+  codeFoldContentColor: "#212529",
+  diffViewerTitleBackground: "#fafbfc",
+  diffViewerTitleColor: "#212529",
+  diffViewerTitleBorderColor: "#eee",
+});
 
-export const defaultDarkThemeVariables: Required<ReactDiffViewerStylesVariables> =
+export const defaultDarkThemeVariables: Readonly<Required<ReactDiffViewerStylesVariables>> =
   {
     diffViewerBackground: "#2e303c",
     diffViewerColor: "#FFF",
