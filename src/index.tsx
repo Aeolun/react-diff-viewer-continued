@@ -17,6 +17,7 @@ import { Expand } from "./expand.js";
 import computeStyles, {
   type ReactDiffViewerStyles,
   type ReactDiffViewerStylesOverride,
+  type ReactDiffViewerStylesVariables,
 } from "./styles.js";
 
 import { Fold } from "./fold.js";
@@ -1743,4 +1744,8 @@ class DiffViewer extends React.Component<
 export default DiffViewer;
 export { DiffMethod };
 export { default as computeStyles } from "./styles.js";
-export type { ReactDiffViewerStylesOverride, ReactDiffViewerStyles };
+export {
+  defaultLightThemeVariables,
+  defaultDarkThemeVariables,
+} from "./styles.js";
+export type { ReactDiffViewerStylesOverride, ReactDiffViewerStyles, ReactDiffViewerStylesVariables };
