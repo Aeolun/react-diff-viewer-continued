@@ -437,8 +437,6 @@ Also this info`;
 });
 
 import * as diff from 'diff';
-import oldJson from '../examples/src/diff/json/old.json';
-import newJson from '../examples/src/diff/json/new.json';
 import oldYaml from '../examples/src/diff/massive/old.yaml?raw';
 import newYaml from '../examples/src/diff/massive/new.yaml?raw';
 
