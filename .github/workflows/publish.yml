@@ -33,16 +33,8 @@ jobs:
       - run: pnpm install
       - run: pnpm build
 
-      # Upgrade npm for provenance support (GitHub runners ship with old npm)
-      - run: npm install -g npm@latest
-
-      - name: Publish to npm
-        run: pnpm publish --access public --provenance --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      # Create GitHub release with changelog notes
-      - name: Create GitHub release
+      - name: Publish and create GitHub release
         run: pnpm just-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
