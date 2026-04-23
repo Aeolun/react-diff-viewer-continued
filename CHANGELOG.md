@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.2.1 (2026-04-23)
+
+### Bug Fixes
+
+- make overscan configurable
+- handle &#x27; HTML entity in diff view to prevent "undefined" suffix
+- mousedown and mouseup
+- do not show content while scrolling fast outside the overscan area
+- update dependencies
+- clean up old package-lock.json
+
 ## 4.2.0 (2026-03-10)
 
 ### Features
