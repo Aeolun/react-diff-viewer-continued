@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.2.2 (2026-04-23)
+
+### Bug Fixes
+
+- strict typescript types, and visible loader
+
 ## 4.2.1 (2026-04-23)
 
 ### Bug Fixes
