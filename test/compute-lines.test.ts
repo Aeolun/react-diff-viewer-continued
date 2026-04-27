@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from "vitest";
-import { DiffMethod, computeLineInformation } from "../src/compute-lines";
+import { DiffMethod, DiffType, computeLineInformation } from "../src/compute-lines";
 
 // Import the actual example JSON files
 import oldJson from "../examples/src/diff/json/old.json";
@@ -924,5 +924,126 @@ describe("Performance tests", (): void => {
 
     expect(result.lineInformation.length).toBeGreaterThan(0);
     expect(duration).toBeLessThan(5000); // Should complete in under 5 seconds
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests for the duplicate-function diff bug fix
+// ---------------------------------------------------------------------------
+// Scenario: old code has `getNewPlan` with body A.  New code introduces a
+// modified `getNewPlan` with body B *and* keeps the original copy with body A
+// verbatim.  Myers (minimum edit-distance) matches old→body-A-copy, making the
+// modified version look all-added.  After the fix the old function must be shown
+// as REMOVED (i.e. highlighted as changed) rather than as DEFAULT context.
+// ---------------------------------------------------------------------------
+
+/** Shared body-A content used across several tests below. */
+const DUPLICATE_FUNC_BODY_A = [
+  "  setNewPlanLoading(true);",
+  "  try {",
+  "    const result = await generateNewAlgorithmSchema({",
+  "      businessLineId: selectBusiness.id,",
+  "      day: selectMonth?.format('YYYYMMDD') || '',",
+  "    });",
+  "    if (result.generateNewAlgorithmSchema) {",
+  "      setModalVisible(true);",
+  "      setNewPlanLoading(false);",
+  "    }",
+  "  } catch (error) {",
+  "    setNewPlanLoading(false);",
+  "    message.error((error as GraphQLError).message);",
+  "  }",
+].join("\n");
+
+describe("Duplicate-function diff fix (issue: same-name function matching wrong occurrence)", (): void => {
+  // ── sub-scenario 1: body B shares one line with body A (produces interleaved Myers pattern) ──
+  it("Should show old function as modified when new file adds a modified version then an identical copy (shared body line)", (): void => {
+    const bodyB = [
+      "  setActionType('new');",
+      "  setNewPlanLoading(true);", // ← this line is also in body A
+      "  await fetchCustomParams();",
+      "  setCustomParamModalVisible(true);",
+    ].join("\n");
+
+    const oldCode = `const getNewPlan = async () => {\n${DUPLICATE_FUNC_BODY_A}\n};`;
+
+    const newCode = [
+      "const fetchCustomParams = async () => {",
+      "  try {",
+      "    const res = await queryList({ businessLineId: selectBusiness.id });",
+      "  } catch (error) { message.error(error.message); }",
+      "};",
+      "",
+      `const getNewPlan = async () => {\n${bodyB}\n};`,
+      "",
+      // Verbatim copy of the old function — Myers without fix would match old→here
+      `const getNewPlan = async () => {\n${DUPLICATE_FUNC_BODY_A}\n};`,
+    ].join("\n");
+
+    const result = computeLineInformation(oldCode, newCode, true);
+
+    // At least several old function lines must be marked as REMOVED — proving the
+    // diff now treats the old function as modified, not silently unchanged.
+    const removedLeftLines = result.lineInformation.filter(
+      (info) => info.left.type === DiffType.REMOVED,
+    );
+    expect(removedLeftLines.length).toBeGreaterThan(2);
+
+    // The diff must still contain right-side additions (the new function versions).
+    const addedRightLines = result.lineInformation.filter(
+      (info) => info.right.type === DiffType.ADDED,
+    );
+    expect(addedRightLines.length).toBeGreaterThan(0);
+  });
+
+  // ── sub-scenario 2: body B has zero lines in common with body A (simple Myers pattern) ──
+  it("Should show old function as modified when body B shares no lines with body A", (): void => {
+    const bodyBNoShared = [
+      "  openConfirmDialog();",
+      "  prepareExportData();",
+      "  triggerValidation('plan');",
+    ].join("\n");
+
+    const oldCode = `const getNewPlan = async () => {\n${DUPLICATE_FUNC_BODY_A}\n};`;
+
+    const newCode = [
+      "const fetchCustomParams = async () => {",
+      "  const res = await queryAlgorithmList({ id: business.id });",
+      "  setCustomParamList(res.list);",
+      "};",
+      "",
+      `const getNewPlan = async () => {\n${bodyBNoShared}\n};`,
+      "",
+      `const getNewPlan = async () => {\n${DUPLICATE_FUNC_BODY_A}\n};`,
+    ].join("\n");
+
+    const result = computeLineInformation(oldCode, newCode, true);
+
+    const removedLeftLines = result.lineInformation.filter(
+      (info) => info.left.type === DiffType.REMOVED,
+    );
+    expect(removedLeftLines.length).toBeGreaterThan(2);
+
+    const addedRightLines = result.lineInformation.filter(
+      (info) => info.right.type === DiffType.ADDED,
+    );
+    expect(addedRightLines.length).toBeGreaterThan(0);
+  });
+
+  // ── sanity: adding content at the top of a file should NOT falsely trigger the fix ──
+  it("Should NOT convert unchanged context lines when new content is prepended to file", (): void => {
+    const oldCode = "const A = 1;\nconst B = 2;\nconst C = 3;\n";
+    const newCode = "const X = 0;\nconst Y = 0;\nconst A = 1;\nconst B = 2;\nconst C = 3;\n";
+
+    const result = computeLineInformation(oldCode, newCode, true);
+
+    // Lines A/B/C are truly unchanged — they must remain DEFAULT on both sides.
+    const leftLines = result.lineInformation
+      .filter((info) => info.left.lineNumber !== undefined)
+      .map((info) => info.left);
+
+    const removedLines = leftLines.filter((l) => l.type === DiffType.REMOVED);
+    // Nothing from the old file should be removed in this scenario
+    expect(removedLines.length).toBe(0);
   });
 });
