@@ -4,3 +4,6 @@ lib
 *.log
 # Auto-generated worker bundle
 src/workerBundle.ts
+# pnpm is canonical; keep stray npm/yarn lockfiles out of the tree
+package-lock.json
+yarn.lock
