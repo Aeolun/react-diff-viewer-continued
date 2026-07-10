@@ -1,3 +1,7 @@
 allowBuilds:
   esbuild: true
   "@parcel/watcher": true
+overrides:
+  # CVE GHSA-jxxr-4gwj-5jf2: DoS via large numeric range. Deep transitive
+  # (just-release>glob>minimatch); force the patched line.
+  "brace-expansion@>=5.0.0 <5.0.6": ">=5.0.6"
