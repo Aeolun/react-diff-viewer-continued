@@ -188,6 +188,9 @@ export default (
   const content = css({
     width: "auto",
     overflow: "hidden",
+    // Host `:where(th,td){ padding }` (daisyui `.table`) would indent the code
+    // column; we own horizontal spacing via gutter/marker instead.
+    padding: 0,
     label: "content",
   });
 
@@ -234,6 +237,18 @@ export default (
     },
     label: "diff-container",
     borderCollapse: "collapse",
+    borderRadius: 0,
+    // Isolate from host table CSS (e.g. daisyui `.table` / `.table-zebra`, Bootstrap,
+    // etc.). Such frameworks emit their table rules inside `@layer` with `:where()`
+    // selectors, so these unlayered declarations win regardless of specificity. We
+    // only reset properties a host injects onto our rows/cells that we do NOT set
+    // ourselves per-cell — background, font-size and padding are pinned on the
+    // individual line/gutter/marker/content classes instead, so this container rule
+    // never outranks and clobbers our own diff colouring.
+    "& td, & th": {
+      border: 0,
+      verticalAlign: "baseline",
+    },
     "@media (max-width: 768px)": {
       minWidth: "unset",
     },
@@ -366,12 +381,16 @@ export default (
     label: "code-fold-gutter",
     minWidth: "50px",
     width: "50px",
+    // Neutralize host `:where(th,td){ padding }` on the fold gutter cell.
+    padding: 0,
     textAlign: "center",
     fill: variables.codeFoldContentColor,
   });
 
   const codeFoldContentContainer = css({
-    padding: "",
+    // Neutralize host `:where(th,td){ padding }` on the fold content cell.
+    padding: 0,
+    label: "code-fold-content-container",
   });
 
   const codeFoldExpandButton = css({
@@ -442,6 +461,10 @@ export default (
     width: 28,
     paddingLeft: 10,
     paddingRight: 10,
+    // Host `padding-block` (daisyui `:where(th,td){ padding }`) would misalign the
+    // +/- marker against its line; pin the vertical padding to zero.
+    paddingTop: 0,
+    paddingBottom: 0,
     userSelect: "none",
     label: "marker",
     [`&.${diffAdded}`]: {
@@ -516,6 +539,11 @@ export default (
     verticalAlign: "baseline",
     label: "line",
     textDecoration: "none",
+    // Neutralize host row styling (e.g. daisyui `.table-zebra` striping and the
+    // `tr { font-size }` set by `.table-*` size variants). Cell-level diff colours
+    // are painted on the td, so a transparent row lets them show through.
+    backgroundColor: "transparent",
+    fontSize: 12,
   });
 
   const column = css({});
