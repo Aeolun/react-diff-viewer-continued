@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.3.0 (2026-07-10)
+
+### Features
+
+- export default light and dark theme variables
+
+### Bug Fixes
+
+- do not do extra publish step, just release publishes
+- make exports immutable
+- freeze dark theme variables and add export-existence tests
+- add GitHub Pages deployment workflow and Vite base path
+- isolate diff table from host table CSS (daisyui/bootstrap)
+- bump js-yaml to ^4.2.0 (CVE-2026-53550)
+- clear remaining audit advisories in dev toolchain
+
+### Documentation
+
+- add overscan, disableWorker, and loading overlay to README
+
+### Chores
+
+- make pnpm canonical (drop npm lockfile, approve builds)
+
 ## 4.2.2 (2026-04-23)
 
 ### Bug Fixes
