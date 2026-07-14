@@ -379,7 +379,7 @@ export interface ReactDiffViewerProps {
 export interface ReactDiffViewerState {
   expandedBlocks: number[];
   noSelect?: "left" | "right";
-  scrollableContainerRef: RefObject<HTMLDivElement | null>
+  scrollableContainerRef: RefObject<HTMLDivElement>
   computedDiffResult: Record<string, ComputedDiffResult>
   isLoading: boolean
   // For virtualization: the first visible row index
@@ -411,9 +411,9 @@ class DiffViewer extends React.Component<
   private highlightPrecedenceWarned = false;
 
   // Refs for measuring content column width and character width
-  private contentColumnRef: RefObject<HTMLTableCellElement | null> = React.createRef();
-  private charMeasureRef: RefObject<HTMLSpanElement | null> = React.createRef();
-  private stickyHeaderRef: RefObject<HTMLDivElement | null> = React.createRef();
+  private contentColumnRef: RefObject<HTMLTableCellElement> = React.createRef();
+  private charMeasureRef: RefObject<HTMLSpanElement> = React.createRef();
+  private stickyHeaderRef: RefObject<HTMLDivElement> = React.createRef();
   private resizeObserver: ResizeObserver | null = null;
   private scrollDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastRenderedRange: { start: number; end: number } = { start: 0, end: Infinity };
