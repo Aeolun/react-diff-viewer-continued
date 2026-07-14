@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.4.0 (2026-07-14)
+
+### Features
+
+- first-party syntax highlighting via highlightLanguage
+
+### Bug Fixes
+
+- build declarations against the React 18 peer floor
+
+### Tests
+
+- add regression repros for reported issues
+
 ## 4.3.0 (2026-07-10)
 
 ### Features
