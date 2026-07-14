@@ -21,8 +21,75 @@ import computeStyles, {
 } from "./styles.js";
 
 import { Fold } from "./fold.js";
+import {
+  type LineTokens,
+  ensureLanguage,
+  highlightSide,
+  mergeHighlightWithDiff,
+  renderHighlightedPlain,
+  sliceLineTokens,
+} from "./highlight.js";
+import {
+  type HighlightTheme,
+  defaultDarkHighlightTheme,
+  defaultLightHighlightTheme,
+} from "./highlight-theme.js";
 
 type IntrinsicElements = JSX.IntrinsicElements;
+
+const LEADING_WHITESPACE = /^[ \t]+/;
+
+/**
+ * Splits a line's leading whitespace off its content so it can be rendered as a
+ * separate fixed-width indent column (see `contentFlex`/`lineIndent`/`lineBody`
+ * styles). Peeling happens *before* the value is highlighted/word-diffed, so the
+ * indent never gets swept into a syntax token or a diff chunk.
+ *
+ * Handles both shapes `renderLine` receives: a raw string, or a word-diff array
+ * whose leading whitespace may span one or more leading chunks (WORDS_WITH_SPACE
+ * isolates indentation as its own chunk) or prefix the first chunk. The remaining
+ * chunks are returned intact so their diff types/colours are preserved.
+ */
+function splitLeadingWhitespace(
+  value: string | DiffInformation[] | undefined,
+): {
+  indent: string;
+  rest: string | DiffInformation[] | undefined;
+} {
+  if (typeof value === "string") {
+    const match = value.match(LEADING_WHITESPACE);
+    return match
+      ? { indent: match[0], rest: value.slice(match[0].length) }
+      : { indent: "", rest: value };
+  }
+  if (Array.isArray(value)) {
+    const chunks = value.map((chunk) => ({ ...chunk }));
+    let indent = "";
+    let i = 0;
+    for (; i < chunks.length; i++) {
+      const chunkValue =
+        typeof chunks[i].value === "string"
+          ? (chunks[i].value as string)
+          : null;
+      if (chunkValue === null) break;
+      const match = chunkValue.match(LEADING_WHITESPACE);
+      if (!match) break;
+      if (match[0].length === chunkValue.length) {
+        // Whole chunk is whitespace — consume it and keep scanning.
+        indent += chunkValue;
+        continue;
+      }
+      // Chunk starts with whitespace then real content — keep the trimmed remainder.
+      indent += match[0];
+      chunks[i] = { ...chunks[i], value: chunkValue.slice(match[0].length) };
+      break;
+    }
+    return indent
+      ? { indent, rest: chunks.slice(i) }
+      : { indent: "", rest: value };
+  }
+  return { indent: "", rest: value };
+}
 
 /**
  * Applies diff styling (ins/del tags) to pre-highlighted HTML by walking through
@@ -292,6 +359,21 @@ export interface ReactDiffViewerProps {
    * Useful when the worker bundle fails to load in certain bundler configurations.
    */
   disableWorker?: boolean
+  /**
+   * Enable first-party syntax highlighting for the given language (a Prism/
+   * refractor language name or alias, e.g. `"typescript"`, `"json"`, `"html"`).
+   * Each side is highlighted as a whole — so constructs that wrap across lines
+   * tokenise correctly — and the highlighting is merged with word-diff marks on
+   * changed lines. Takes precedence over `renderContent` for line content.
+   * Unknown languages fall back gracefully to no highlighting.
+   */
+  highlightLanguage?: string
+  /**
+   * Optional overrides for the syntax-highlight colour palette. Merged over the
+   * built-in light/dark theme (selected by `useDarkTheme`). Keys are Prism token
+   * types (`keyword`, `string`, `tag`, ...) plus `default`.
+   */
+  highlightTheme?: HighlightTheme
 }
 
 export interface ReactDiffViewerState {
@@ -307,6 +389,13 @@ export interface ReactDiffViewerState {
   charWidth: number | null;
   cumulativeOffsets: number[] | null;
   isScrolling: boolean;
+  // Per-side syntax-highlight tokens, keyed by line number. Null when
+  // `highlightLanguage` is unset or the grammar is unavailable.
+  highlightResult: {
+    key: string;
+    left: Map<number, LineTokens>;
+    right: Map<number, LineTokens>;
+  } | null;
 }
 
 class DiffViewer extends React.Component<
@@ -317,6 +406,9 @@ class DiffViewer extends React.Component<
 
   // Cache for on-demand word diff computation
   private wordDiffCache: Map<string, { left: DiffInformation[]; right: DiffInformation[] }> = new Map();
+
+  // Ensures the highlightLanguage/renderContent precedence warning fires once.
+  private highlightPrecedenceWarned = false;
 
   // Refs for measuring content column width and character width
   private contentColumnRef: RefObject<HTMLTableCellElement | null> = React.createRef();
@@ -356,6 +448,7 @@ class DiffViewer extends React.Component<
       charWidth: null,
       cumulativeOffsets: null,
       isScrolling: false,
+      highlightResult: null,
     };
   }
 
@@ -729,14 +822,55 @@ class DiffViewer extends React.Component<
     const added = type === DiffType.ADDED;
     const removed = type === DiffType.REMOVED;
     const changed = type === DiffType.CHANGED;
+    // Peel the leading whitespace into a separate indent column before any
+    // highlighting/word-diffing runs, so wrapped continuation lines hang-indent
+    // under the line's first character instead of the cell's left edge.
+    const { indent, rest } = splitLeadingWhitespace(value);
+    const hasWordDiff = Array.isArray(rest);
+
+    // First-party syntax highlighting: look up this line's whole-side tokens and
+    // rebase them past the peeled indent so they line up with the diff body.
+    const highlightMap = this.state.highlightResult
+      ? prefix === LineNumberPrefix.LEFT
+        ? this.state.highlightResult.left
+        : this.state.highlightResult.right
+      : null;
+    const sideLineNumber = lineNumber ?? additionalLineNumber ?? undefined;
+    const fullLineTokens =
+      highlightMap && sideLineNumber != null ? highlightMap.get(sideLineNumber) : undefined;
+    const bodyTokens = fullLineTokens ? sliceLineTokens(fullLineTokens, indent.length) : undefined;
+
+    // Longest body we'll merge char-by-char before falling back to plain colour.
+    const MAX_HIGHLIGHT_MERGE_LENGTH = 500;
+
     let content;
-    const hasWordDiff = Array.isArray(value);
-    if (hasWordDiff) {
-      content = this.renderWordDiff(value, this.props.renderContent);
-    } else if (this.props.renderContent && typeof value === "string") {
-      content = this.props.renderContent(value);
+    if (bodyTokens) {
+      if (hasWordDiff) {
+        const bodyText = rest
+          .map((chunk) => (typeof chunk.value === "string" ? chunk.value : ""))
+          .join("");
+        content =
+          bodyText.length > MAX_HIGHLIGHT_MERGE_LENGTH
+            ? renderHighlightedPlain(bodyText, bodyTokens)
+            : mergeHighlightWithDiff(bodyText, bodyTokens, rest, {
+                styles: {
+                  wordDiff: this.styles.wordDiff,
+                  wordAdded: this.styles.wordAdded,
+                  wordRemoved: this.styles.wordRemoved,
+                },
+                showHighlight: this.shouldHighlightWordDiff(),
+              });
+      } else if (typeof rest === "string") {
+        content = renderHighlightedPlain(rest, bodyTokens);
+      } else {
+        content = rest;
+      }
+    } else if (hasWordDiff) {
+      content = this.renderWordDiff(rest, this.props.renderContent);
+    } else if (this.props.renderContent && typeof rest === "string") {
+      content = this.props.renderContent(rest);
     } else {
-      content = value;
+      content = rest;
     }
 
     let ElementType: keyof IntrinsicElements = "div";
@@ -745,6 +879,10 @@ class DiffViewer extends React.Component<
     } else if (removed && !hasWordDiff) {
       ElementType = "del";
     }
+
+    // A line is only "empty" (gets the empty-line background) when it has neither
+    // body content nor peeled indentation — a whitespace-only line is not empty.
+    const isEmpty = !content && !indent;
 
     return (
       <>
@@ -794,7 +932,7 @@ class DiffViewer extends React.Component<
           : null}
         <td
           className={cn(this.styles.marker, {
-            [this.styles.emptyLine]: !content,
+            [this.styles.emptyLine]: isEmpty,
             [this.styles.diffAdded]: added,
             [this.styles.diffRemoved]: removed,
             [this.styles.diffChanged]: changed,
@@ -809,7 +947,7 @@ class DiffViewer extends React.Component<
         <td
           ref={prefix === LineNumberPrefix.LEFT && !this.state.cumulativeOffsets ? this.contentColumnRef : undefined}
           className={cn(this.styles.content, {
-            [this.styles.emptyLine]: !content,
+            [this.styles.emptyLine]: isEmpty,
             [this.styles.diffAdded]: added,
             [this.styles.diffRemoved]: removed,
             [this.styles.diffChanged]: changed,
@@ -841,8 +979,9 @@ class DiffViewer extends React.Component<
                 : undefined
           }
         >
-          <ElementType className={this.styles.contentText}>
-            {content}
+          <ElementType className={cn(this.styles.contentText, this.styles.contentFlex)}>
+            {indent ? <span className={this.styles.lineIndent}>{indent}</span> : null}
+            <span className={this.styles.lineBody}>{content}</span>
           </ElementType>
         </td>
       </>
@@ -1105,6 +1244,7 @@ class DiffViewer extends React.Component<
         ...prev,
         isLoading: false
       }))
+      this.updateHighlight();
       return;
     }
 
@@ -1147,6 +1287,8 @@ class DiffViewer extends React.Component<
       computedDiffResult: this.state.computedDiffResult,
       isLoading: false,
     }), () => {
+      // Recompute syntax highlighting now that fresh line information exists.
+      this.updateHighlight();
       // Trigger offset recalculation after diff is computed and rendered
       // Use requestAnimationFrame to ensure DOM is ready for measurement
       if (this.props.infiniteLoading) {
@@ -1154,6 +1296,109 @@ class DiffViewer extends React.Component<
       }
     })
   }
+
+  /**
+   * Extracts the raw text of one side of a line for whole-side highlighting.
+   * Prefers `rawValue` (deferred word diff), then a plain string value, then the
+   * concatenation of word-diff chunk values.
+   */
+  private lineToText = (info: DiffInformation): string => {
+    if (typeof info.rawValue === "string") return info.rawValue;
+    if (typeof info.value === "string") return info.value;
+    if (Array.isArray(info.value)) {
+      return info.value.map((chunk) => (typeof chunk.value === "string" ? chunk.value : "")).join("");
+    }
+    return "";
+  };
+
+  /**
+   * Reconstructs one side's full document from the computed line information and
+   * highlights it in a single pass, returning per-line tokens keyed by line
+   * number. Highlighting the whole side (rather than line-by-line) is what keeps
+   * lexer state correct across line boundaries.
+   */
+  private buildSideTokens = (
+    lineInformation: LineInformation[],
+    side: "left" | "right",
+    language: string,
+    theme: HighlightTheme,
+  ): Map<number, LineTokens> => {
+    const entries: { lineNumber: number; text: string }[] = [];
+    for (const line of lineInformation) {
+      const info = line[side];
+      if (!info || info.lineNumber == null) continue;
+      entries.push({ lineNumber: info.lineNumber, text: this.lineToText(info) });
+    }
+    entries.sort((a, b) => a.lineNumber - b.lineNumber);
+
+    const result = new Map<number, LineTokens>();
+    if (entries.length === 0) return result;
+
+    const perLine = highlightSide(entries.map((e) => e.text).join("\n"), language, theme);
+    if (!perLine) return result;
+
+    for (let i = 0; i < entries.length; i++) {
+      result.set(entries[i].lineNumber, perLine[i] ?? []);
+    }
+    return result;
+  };
+
+  /**
+   * Resolves the active highlight theme (built-in light/dark, with any
+   * `highlightTheme` overrides merged on top).
+   */
+  private resolveHighlightTheme = (): HighlightTheme => {
+    const base = this.props.useDarkTheme ? defaultDarkHighlightTheme : defaultLightHighlightTheme;
+    return this.props.highlightTheme ? { ...base, ...this.props.highlightTheme } : base;
+  };
+
+  /**
+   * Computes syntax-highlight tokens for both sides when `highlightLanguage` is
+   * set, storing them in state. Lazily loads the grammar, is memoised by
+   * (diff, language, theme, dark) so it is cheap to call repeatedly, and clears
+   * the result when highlighting is disabled or the language is unavailable.
+   */
+  private updateHighlight = async (): Promise<void> => {
+    const { highlightLanguage } = this.props;
+    if (!highlightLanguage) {
+      if (this.state.highlightResult) this.setState({ highlightResult: null });
+      return;
+    }
+
+    const diffKey = this.getMemoisedKey();
+    const diffResult = this.state.computedDiffResult[diffKey];
+    // Diff not ready yet — memoisedCompute re-invokes updateHighlight when it is.
+    if (!diffResult) return;
+
+    const dark = this.props.useDarkTheme ?? false;
+    const key = `${diffKey}::${highlightLanguage}::${dark}::${JSON.stringify(this.props.highlightTheme ?? null)}`;
+    if (this.state.highlightResult?.key === key) return;
+
+    const canonical = await ensureLanguage(highlightLanguage);
+    // Bail if props changed while the grammar was loading.
+    if (this.props.highlightLanguage !== highlightLanguage || this.getMemoisedKey() !== diffKey) return;
+    if (!canonical) {
+      if (this.state.highlightResult) this.setState({ highlightResult: null });
+      return;
+    }
+
+    if (
+      !this.highlightPrecedenceWarned &&
+      this.props.renderContent &&
+      typeof process !== "undefined" &&
+      process.env?.NODE_ENV !== "production"
+    ) {
+      this.highlightPrecedenceWarned = true;
+      console.warn(
+        "[react-diff-viewer] `highlightLanguage` takes precedence over `renderContent`; `renderContent` is ignored for line content while highlighting is active.",
+      );
+    }
+
+    const theme = this.resolveHighlightTheme();
+    const left = this.buildSideTokens(diffResult.lineInformation, "left", canonical, theme);
+    const right = this.buildSideTokens(diffResult.lineInformation, "right", canonical, theme);
+    this.setState({ highlightResult: { key, left, right } });
+  };
 
   // Estimated row height based on lineHeight: 1.6em with 12px base font
   private static readonly ESTIMATED_ROW_HEIGHT = 19;
@@ -1435,6 +1680,13 @@ class DiffViewer extends React.Component<
         cumulativeOffsets: null as number[] | null,
       }))
       this.memoisedCompute();
+    } else if (
+      prevProps.highlightLanguage !== this.props.highlightLanguage ||
+      prevProps.highlightTheme !== this.props.highlightTheme ||
+      prevProps.useDarkTheme !== this.props.useDarkTheme
+    ) {
+      // Highlighting inputs changed but the diff itself did not — just re-tokenise.
+      this.updateHighlight();
     }
   }
 
@@ -1748,4 +2000,9 @@ export {
   defaultLightThemeVariables,
   defaultDarkThemeVariables,
 } from "./styles.js";
+export {
+  defaultLightHighlightTheme,
+  defaultDarkHighlightTheme,
+} from "./highlight-theme.js";
 export type { ReactDiffViewerStylesOverride, ReactDiffViewerStyles, ReactDiffViewerStylesVariables };
+export type { HighlightTheme } from "./highlight-theme.js";

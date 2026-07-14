@@ -13,6 +13,9 @@ export interface ReactDiffViewerStyles {
   gutter: string;
   highlightedLine: string;
   lineNumber: string;
+  contentFlex: string;
+  lineIndent: string;
+  lineBody: string;
   marker: string;
   wordDiff: string;
   wordAdded: string;
@@ -268,6 +271,33 @@ export default (
     label: "content-text",
   });
 
+  // Line content is laid out as two flex items: a fixed indent column carrying the
+  // line's leading whitespace, and a flexible body that wraps. This gives wrapped
+  // continuation lines a hanging indent — they align under the first character of
+  // the line's content instead of falling back to the cell's left edge.
+  const contentFlex = css({
+    display: "flex",
+    alignItems: "baseline",
+    label: "content-flex",
+  });
+
+  // The indent column. `pre` + `flex-shrink: 0` keep the whitespace intact and
+  // prevent it from ever collapsing or wrapping, so it sizes exactly to the indent.
+  const lineIndent = css({
+    whiteSpace: "pre",
+    wordBreak: "keep-all",
+    flex: "0 0 auto",
+    label: "line-indent",
+  });
+
+  // The wrapping body. `min-width: 0` is required so a long unbreakable run wraps
+  // within the flex item instead of overflowing the row.
+  const lineBody = css({
+    flex: "1 1 auto",
+    minWidth: 0,
+    label: "line-body",
+  });
+
   const unselectable = css({
     userSelect: "none",
     label: "unselectable",
@@ -390,15 +420,31 @@ export default (
   const codeFoldContentContainer = css({
     // Neutralize host `:where(th,td){ padding }` on the fold content cell.
     padding: 0,
+    // Clip the button to the cell box so any residual misalignment can't bleed into the row flow.
+    overflow: "hidden",
+    // `diffContainer`'s `& td` isolation reset pins vertical-align:baseline at specificity
+    // (0,2,0), which out-ranks this single class and drags the fold cell back onto the row
+    // baseline (the ~2-3px offset). Self-chain the selector to (0,3,0) so the fold cell's
+    // middle alignment wins over that reset.
+    "&&&": {
+      verticalAlign: "middle",
+    },
     label: "code-fold-content-container",
   });
 
   const codeFoldExpandButton = css({
     background: variables.codeFoldBackground,
     cursor: "pointer",
-    display: "inline",
+    // `display: inline` puts the button in the cell's line box, so baseline/line-height
+    // metrics nudge it ~2-3px down from the cell top and it spills past the bottom.
+    // A block box leaves the inline formatting context and sits flush.
+    display: "block",
     margin: 0,
+    padding: 0,
     border: "none",
+    font: "inherit",
+    lineHeight: "inherit",
+    textAlign: "left",
     fill: variables.codeFoldContentColor,
     label: "code-fold-expand-button",
   });
@@ -435,6 +481,14 @@ export default (
     fontWeight: 700,
     cursor: "pointer",
     label: "code-fold",
+    // The fold row has empty/classless placeholder cells (spacer gutters, line-number
+    // stand-ins) that pin no padding of their own. Host `:where(th,td){ padding }`
+    // (daisyui `.table`) inflates their vertical padding and stretches the fold row
+    // out of line with the code rows. Zero block padding on every cell in the row.
+    "& td": {
+      paddingTop: 0,
+      paddingBottom: 0,
+    },
     "&:hover": {
       color: variables.diffViewerColor,
       fill: variables.diffViewerColor,
@@ -577,6 +631,9 @@ export default (
     emptyLine,
     lineNumber,
     contentText,
+    contentFlex,
+    lineIndent,
+    lineBody,
     content,
     column,
     codeFoldContent,

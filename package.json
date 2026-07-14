@@ -48,7 +48,8 @@
     "classnames": "^2.5.1",
     "diff": "^9.0.0",
     "js-yaml": "^4.2.0",
-    "memoize-one": "^6.0.0"
+    "memoize-one": "^6.0.0",
+    "refractor": "^5.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
