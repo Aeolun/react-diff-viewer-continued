@@ -391,6 +391,247 @@ const constructLines = (value: string): string[] => {
 };
 
 /**
+ * Fixes the "duplicate function" diff problem where the Myers algorithm matches
+ * old content to a far-away identical copy in the new file, instead of a nearby
+ * modified version.
+ *
+ * Myers minimises total edit distance. When a function body is copied verbatim
+ * elsewhere in the new file, matching old→copy costs 0 edits, which Myers
+ * prefers — even though a modified version of the function appears earlier.
+ * The result: the modified version looks "all-added" and the old function looks
+ * "unchanged", which is confusing.
+ *
+ * Pattern detected: [..., ADDED(A), SAME(S)] where
+ *   - no REMOVED blocks precede SAME(S) in the diff, and
+ *   - S's first significant line also appears somewhere inside A.
+ *
+ * When this pattern is found it means Myers matched old content S to a LATER
+ * identical copy, while an EARLIER (possibly modified) version lives inside A.
+ *
+ * Transformation applied:
+ *   [..., ADDED(A), SAME(S)]
+ *   → [..., ADDED(A[0..k-1]), REMOVED(S), ADDED(A[k..]), ADDED(S)]
+ *
+ * where k is the index in A at which S's first significant line first appears.
+ *
+ * Effect in the viewer:
+ *   • ADDED(A[0..k-1])  — new content before the modified function (green)
+ *   • REMOVED(S) paired with ADDED(A[k..])  — old function shown as modified
+ *     against the nearby earlier version (highlighted changes) ✓
+ *   • ADDED(S)  — the identical copy further in the new file (green) ✓
+ */
+function cleanupLongDistanceSame(changes: Change[]): Change[] {
+  if (changes.length === 0) return changes;
+
+  // Only apply when no REMOVED blocks exist yet (pure-addition scenario).
+  // This avoids interfering with diffs that already have explicit removals.
+  if (changes.some(c => c.removed)) return changes;
+
+  // Minimum trimmed length for a line to be considered "significant".
+  // Short lines like "}", "};", or "{" are too common to be reliable anchors.
+  const MIN_SIG_LINE_LENGTH = 8;
+
+  for (let i = 0; i < changes.length; i++) {
+    const chunk = changes[i];
+    if (chunk.added || chunk.removed) continue;
+
+    // ── SAME block ──────────────────────────────────────────────────────────
+    const sameLines = constructLines(chunk.value);
+
+    // Only consider blocks with multiple lines (single-line matches are rarely
+    // the source of this problem).
+    if (sameLines.length < 2) continue;
+
+    // Find the first significant line of this SAME block.
+    const firstSigLine = sameLines.find(l => l.trim().length > MIN_SIG_LINE_LENGTH);
+    if (!firstSigLine) continue;
+
+    // Search preceding ADDED chunks for the earliest occurrence of firstSigLine.
+    let targetAddedChunkIdx = -1;
+    let targetLineInChunk = -1;
+
+    for (let j = 0; j < i; j++) {
+      if (!changes[j].added) continue;
+      const addedLines = constructLines(changes[j].value);
+      const lineIdx = addedLines.indexOf(firstSigLine);
+      if (lineIdx !== -1) {
+        targetAddedChunkIdx = j;
+        targetLineInChunk = lineIdx;
+        break; // use the first (earliest) occurrence
+      }
+    }
+
+    if (targetAddedChunkIdx === -1) continue;
+
+    // ── Apply the transformation ────────────────────────────────────────────
+    const targetLines = constructLines(changes[targetAddedChunkIdx].value);
+    const beforeLines = targetLines.slice(0, targetLineInChunk);
+    const fromLines   = targetLines.slice(targetLineInChunk);
+
+    const newChanges: Change[] = [];
+
+    for (let j = 0; j < changes.length; j++) {
+      if (j === targetAddedChunkIdx) {
+        // Split the target ADDED chunk at the found line.
+        if (beforeLines.length > 0) {
+          newChanges.push({ value: beforeLines.join('\n') + '\n', added: true });
+        }
+        // Old content (S) is now explicitly removed.
+        newChanges.push({ value: chunk.value, removed: true });
+        // Remaining part of the original ADDED chunk follows immediately so
+        // that compute-lines.ts pairs REMOVED(S) with this ADDED section.
+        if (fromLines.length > 0) {
+          newChanges.push({ value: fromLines.join('\n') + '\n', added: true });
+        }
+      } else if (j === i) {
+        // Replace SAME(S) with ADDED(S): the new-file copy is shown as added.
+        newChanges.push({ value: chunk.value, added: true });
+      } else {
+        newChanges.push(changes[j]);
+      }
+    }
+
+    return newChanges;
+  }
+
+  return changes;
+}
+
+/**
+ * Fixes the interleaved variant of the "duplicate function" diff problem.
+ *
+ * Myers sometimes produces an interleaved pattern for this bug:
+ *   [ADDED(A1), SAME(S1), ADDED(A2), SAME(S2), ...]
+ * where SAME blocks are contiguous in the *old* file but non-contiguous in the
+ * *new* file — i.e. S1 is matched to one occurrence and S2+ to another.
+ *
+ * This is detected by a large gap between consecutive SAME blocks' new-file
+ * positions relative to their old-file gap (e.g. 6 new lines skipped but
+ * only 0 old lines between them).
+ *
+ * When detected, the entire run of "split-matched" SAME blocks is consolidated:
+ *   [...ADDED, SAME(S1), ...ADDED, SAME(S2), ...]
+ *   → [...ADDED(before_S1), REMOVED(S1+S2+…), ADDED(new_content_from_S1), ...]
+ *
+ * Effect in the viewer:
+ *   • ADDED(before) — new content before the function (green)
+ *   • REMOVED(old) paired with ADDED(nearby_new) — old function shown as
+ *     modified against the nearby modified version (highlighted changes) ✓
+ *   • Remaining content continues normally
+ */
+function cleanupSplitMatches(changes: Change[]): Change[] {
+  if (changes.length === 0) return changes;
+
+  // Don't interfere if there are already explicit REMOVED blocks.
+  if (changes.some(c => c.removed)) return changes;
+
+  // Compute cumulative old / new positions for every chunk.
+  interface SegInfo {
+    chunkIdx: number;
+    isSame: boolean;
+    oldStart: number;
+    oldEnd: number;
+    newStart: number;
+    newEnd: number;
+  }
+
+  const segs: SegInfo[] = [];
+  let op = 0;
+  let np = 0;
+
+  for (let i = 0; i < changes.length; i++) {
+    const c = changes[i];
+    const n = constructLines(c.value).length;
+    const isSame = !c.added && !c.removed;
+    segs.push({
+      chunkIdx: i,
+      isSame,
+      oldStart: op,
+      oldEnd:   c.added    ? op      : op + n,
+      newStart: np,
+      newEnd:   c.removed  ? np      : np + n,
+    });
+    if (!c.added)   op += n;
+    if (!c.removed) np += n;
+  }
+
+  // Collect SAME segments only.
+  const sameSegs = segs.filter(s => s.isSame);
+  if (sameSegs.length < 2) return changes;
+
+  // Find the first pair of consecutive SAMEs where the new-file gap is much
+  // larger than the old-file gap — a clear "split match" signal.
+  // Threshold: new_gap > 3 × max(old_gap, 1)  AND  new_gap > 3 lines.
+  const THRESHOLD_RATIO = 3;
+  const THRESHOLD_ABS   = 3;
+
+  let splitIdx = -1; // index into sameSegs[]
+
+  for (let i = 1; i < sameSegs.length; i++) {
+    const prev = sameSegs[i - 1];
+    const curr = sameSegs[i];
+    const oldGap = curr.oldStart - prev.oldEnd;
+    const newGap = curr.newStart - prev.newEnd;
+
+    if (
+      newGap > THRESHOLD_RATIO * Math.max(oldGap, 1) &&
+      newGap > THRESHOLD_ABS
+    ) {
+      splitIdx = i - 1; // split starts at prev
+      break;
+    }
+  }
+
+  if (splitIdx === -1) return changes;
+
+  // Collect the contiguous-in-old run of SAMEs starting from sameSegs[splitIdx].
+  const groupSames: SegInfo[] = [sameSegs[splitIdx]];
+  for (let i = splitIdx + 1; i < sameSegs.length; i++) {
+    const last = groupSames[groupSames.length - 1];
+    const next = sameSegs[i];
+    // "contiguous in old" means the next SAME starts exactly where the last ended.
+    if (next.oldStart === last.oldEnd) {
+      groupSames.push(next);
+    } else {
+      break;
+    }
+  }
+
+  const firstSameChunkIdx = groupSames[0].chunkIdx;
+  const lastSameChunkIdx  = groupSames[groupSames.length - 1].chunkIdx;
+
+  // Build the transformed diff array.
+  // Everything before the first SAME in the group stays unchanged.
+  const newChanges: Change[] = changes.slice(0, firstSameChunkIdx);
+
+  // Collect the old content of all SAMEs in the group → REMOVED block.
+  let removedValue = '';
+  for (const s of groupSames) {
+    removedValue += changes[s.chunkIdx].value;
+  }
+
+  // Collect the new-file content (ADDED + SAME_new) from the first SAME to the
+  // last SAME in the group → ADDED block that immediately follows REMOVED.
+  let addedFromStart = '';
+  for (let j = firstSameChunkIdx; j <= lastSameChunkIdx; j++) {
+    if (changes[j].added || !changes[j].removed) {
+      // ADDED chunks and SAME chunks both contribute to the new-file content.
+      addedFromStart += changes[j].value;
+    }
+  }
+
+  newChanges.push({ value: removedValue,   removed: true });
+  newChanges.push({ value: addedFromStart, added:   true });
+
+  // Append everything after the last SAME in the group unchanged.
+  for (let j = lastSameChunkIdx + 1; j < changes.length; j++) {
+    newChanges.push(changes[j]);
+  }
+
+  return newChanges;
+}
+
+/**
  * Computes word diff information in the line.
  * [TODO]: Consider adding options argument for JsDiff text block comparison
  *
@@ -474,6 +715,13 @@ const computeLineInformation = (
       diffArray = diff.diffLines(oldString, newString, {
         newlineIsToken: false,
       });
+      // Post-process to fix semantic issues with duplicate functions/blocks.
+      // Myers can match old content to a far-away identical copy, making a nearby
+      // modified version appear as all-added. Two complementary passes handle the
+      // simple [ADDED, SAME] pattern and the interleaved [ADDED,SAME,ADDED,SAME]
+      // pattern respectively.
+      diffArray = cleanupLongDistanceSame(diffArray);
+      diffArray = cleanupSplitMatches(diffArray);
     }
   } else {
     // Use our fast structural JSON diff instead of diff.diffJson
