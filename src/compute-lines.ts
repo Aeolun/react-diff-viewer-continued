@@ -440,6 +440,7 @@ const computeDiff = (
  * @param lineCompareMethod JsDiff text diff method from https://github.com/kpdecker/jsdiff/tree/v4.0.1#api
  * @param linesOffset line number to start counting from
  * @param showLines lines that are always shown, regardless of diff
+ * @param ignoreWhitespace Ignore leading/trailing whitespace when comparing lines
  */
 const computeLineInformation = (
   oldString: string | Record<string, unknown>,
@@ -451,6 +452,7 @@ const computeLineInformation = (
   linesOffset = 0,
   showLines: string[] = [],
   deferWordDiff = false,
+  ignoreWhitespace = false,
 ): ComputedLineInformation => {
   let diffArray: Change[] = [];
 
@@ -468,11 +470,13 @@ const computeLineInformation = (
         // If YAML parsing fails, fall back to line diff
         diffArray = diff.diffLines(oldString, newString, {
           newlineIsToken: false,
+          ignoreWhitespace,
         });
       }
     } else {
       diffArray = diff.diffLines(oldString, newString, {
         newlineIsToken: false,
+        ignoreWhitespace,
       });
     }
   } else {
@@ -638,6 +642,7 @@ const computeLineInformation = (
  * @param lineCompareMethod JsDiff text diff method from https://github.com/kpdecker/jsdiff/tree/v4.0.1#api
  * @param linesOffset line number to start counting from
  * @param showLines lines that are always shown, regardless of diff
+ * @param ignoreWhitespace Ignore leading/trailing whitespace when comparing lines
  * @returns Promise<ComputedLineInformation> - Resolves with line-by-line diff data from the worker.
  */
 // Cached Blob URL for the worker - created once and reused
@@ -678,8 +683,9 @@ const computeLineInformationWorker = async (
   showLines: string[] = [],
   deferWordDiff = false,
   disableWorker = false,
+  ignoreWhitespace = false,
 ): Promise<ComputedLineInformation> => {
-  const fallback = () => computeLineInformation(oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff);
+  const fallback = () => computeLineInformation(oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff, ignoreWhitespace);
 
   if (disableWorker) {
     return Promise.resolve(fallback());
@@ -711,7 +717,7 @@ const computeLineInformationWorker = async (
       resolve(fallback());
     };
 
-    worker.postMessage({ oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff });
+    worker.postMessage({ oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff, ignoreWhitespace });
   });
 };
 

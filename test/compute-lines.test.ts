@@ -434,6 +434,38 @@ Also this info`;
       diffLines: [0, 1],
     });
   });
+
+  describe("Ignoring whitespace", (): void => {
+    const oldCode = ["function example() {", "  const x = 1;", "  return x;", "}"].join("\n");
+
+    it("Should report indentation-only changes by default", (): void => {
+      const newCode = ["function example() {", "      const x = 1;", "  return x;", "}"].join("\n");
+
+      expect(computeLineInformation(oldCode, newCode).diffLines).toEqual([1]);
+    });
+
+    it("Should ignore indentation-only changes when ignoreWhitespace is set", (): void => {
+      const newCode = ["function example() {", "      const x = 1;", "  return x;", "}"].join("\n");
+
+      const result = computeLineInformation(newCode, oldCode, false, undefined, 0, [], false, true);
+
+      expect(result.diffLines).toEqual([]);
+      expect(result.lineInformation.every(({ left, right }) => left.type === 0 && right.type === 0)).toBe(true);
+    });
+
+    it("Should ignore trailing-whitespace-only changes when ignoreWhitespace is set", (): void => {
+      const newCode = ["function example() {", "  const x = 1;   ", "  return x;", "}"].join("\n");
+
+      expect(computeLineInformation(oldCode, newCode).diffLines).toEqual([1]);
+      expect(computeLineInformation(oldCode, newCode, false, undefined, 0, [], false, true).diffLines).toEqual([]);
+    });
+
+    it("Should still report real changes when ignoreWhitespace is set", (): void => {
+      const newCode = ["function example() {", "      const x = 2;", "  return x;", "}"].join("\n");
+
+      expect(computeLineInformation(oldCode, newCode, false, undefined, 0, [], false, true).diffLines).toEqual([1]);
+    });
+  });
 });
 
 import * as diff from 'diff';

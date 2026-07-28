@@ -5,7 +5,7 @@ import { computeLineInformation } from "./compute-lines.js";
  * When the main thread sends a message to this worker (via postMessage), this function is triggered.
  */
 self.onmessage = (e) => {
-  const { oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff } = e.data;
-  const result = computeLineInformation(oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff);
+  const { oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff, ignoreWhitespace } = e.data;
+  const result = computeLineInformation(oldString, newString, disableWordDiff, lineCompareMethod, linesOffset, showLines, deferWordDiff, ignoreWhitespace);
   self.postMessage(result);
 };
